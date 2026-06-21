@@ -15,7 +15,9 @@ import {
   Alert,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { NotificationModal } from "@/components/notification-modal";
 import { useColors } from "@/hooks/use-colors";
+import { useNotification } from "@/lib/notification-context";
 import {
   friendsApi,
   Friend,
@@ -28,6 +30,7 @@ type TabType = "friends" | "requests" | "invites";
 
 export default function FriendsScreen() {
   const colors = useColors();
+  const { pendingInvite, dismissInviteNotification } = useNotification();
   const [activeTab, setActiveTab] = useState<TabType>("friends");
   const [friends, setFriends] = useState<Friend[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
@@ -279,16 +282,17 @@ export default function FriendsScreen() {
   }
 
   return (
-    <ScreenContainer className="flex-1 p-0">
-      {/* 标签页 */}
-      <View className="flex-row border-b border-border">
-        <TabButton tab="friends" label={`好友 (${friends.length})`} />
-        <TabButton
-          tab="requests"
-          label={`申请 (${incomingRequests.length})`}
-        />
-        <TabButton tab="invites" label={`邀请 (${roomInvites.length})`} />
-      </View>
+    <>
+      <ScreenContainer className="flex-1 p-0">
+        {/* 标签页 */}
+        <View className="flex-row border-b border-border">
+          <TabButton tab="friends" label={`好友 (${friends.length})`} />
+          <TabButton
+            tab="requests"
+            label={`申请 (${incomingRequests.length})`}
+          />
+          <TabButton tab="invites" label={`邀请 (${roomInvites.length})`} />
+        </View>
 
       {/* 内容 */}
       <View className="flex-1 px-4 pt-4">
@@ -355,6 +359,18 @@ export default function FriendsScreen() {
           />
         )}
       </View>
-    </ScreenContainer>
+      </ScreenContainer>
+
+      {/* 通知弹窗 */}
+      <NotificationModal
+        visible={!!pendingInvite}
+        invite={pendingInvite}
+        onDismiss={dismissInviteNotification}
+        onAccept={() => {
+          // 刷新好友数据
+          fetchFriendsData();
+        }}
+      />
+    </>
   );
 }

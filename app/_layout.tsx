@@ -11,6 +11,7 @@ import * as SplashScreen from "expo-splash-screen";
 
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { NotificationProvider } from "@/lib/notification-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 // 保持 Splash Screen 显示直到资源加载完成
@@ -43,9 +44,7 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
-    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
-  });
+  const [fontsLoaded] = useFonts({});
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -53,15 +52,18 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return null;
-  }
+  // Fonts are optional, continue even if not loaded
+  // if (!fontsLoaded) {
+  //   return null;
+  // }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <AuthProvider>
-          <RootLayoutNav />
+          <NotificationProvider>
+            <RootLayoutNav />
+          </NotificationProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
