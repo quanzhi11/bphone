@@ -13,9 +13,11 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { useAuth } from "@/lib/auth-context";
 import { roomsApi, Room } from "@/lib/_core/booxin-api";
 
 export default function HomeScreen() {
+  const { state: authState } = useAuth();
   const colors = useColors();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,14 +41,16 @@ export default function HomeScreen() {
     }
   }, []);
 
-  // 初始加载
+  // 初始加载（仅在已登录时）
   useEffect(() => {
-    fetchRooms();
+    if (authState.userToken) {
+      fetchRooms();
 
-    // 定时刷新（30 秒）
-    const interval = setInterval(fetchRooms, 30000);
-    return () => clearInterval(interval);
-  }, [fetchRooms]);
+      // 定时刷新（30 秒）
+      const interval = setInterval(fetchRooms, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [fetchRooms, authState.userToken]);
 
   // 下拉刷新
   const handleRefresh = useCallback(() => {

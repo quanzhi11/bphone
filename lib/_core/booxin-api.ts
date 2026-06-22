@@ -10,8 +10,10 @@ import axios, { AxiosInstance, AxiosError } from "axios";
 import * as SecureStore from "expo-secure-store";
 
 // API 基础 URL（支持直连和 HTTPS 反代）
-const AUTH_API_BASE = "https://175.178.174.103/bbx";
-const ROOM_API_BASE = "http://175.178.174.103:5000";
+// 注意：在 Web 预览中，HTTP 会被 Mixed Content 阻止，自签证书会被浏览器拒绝
+// 生产环境应使用有效的 HTTPS 域名或通过服务器反代
+const AUTH_API_BASE = "https://175.178.174.103:5005";
+const ROOM_API_BASE = "https://175.178.174.103:5000";
 
 // Token 存储 key
 const TOKEN_STORAGE_KEY = "booxin_access_token";
