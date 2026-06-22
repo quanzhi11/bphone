@@ -17,12 +17,12 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { authApi, friendsApi, LobbyUser } from "@/lib/_core/booxin-api";
+import { authApi, friendsApi, User } from "@/lib/_core/booxin-api";
 import * as Haptics from "expo-haptics";
 
 export default function LobbyScreen() {
   const colors = useColors();
-  const [users, setUsers] = useState<LobbyUser[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +94,7 @@ export default function LobbyScreen() {
     async (userId: string, username: string) => {
       try {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        await friendsApi.sendRequest(userId);
+        await friendsApi.sendFriendRequest(userId);
         Alert.alert("成功", `已向 ${username} 发送好友申请`);
         // 刷新列表以更新状态
         await fetchUsers(1, false);
@@ -108,7 +108,7 @@ export default function LobbyScreen() {
   );
 
   // 用户卡片
-  const UserCard = ({ user }: { user: LobbyUser }) => {
+  const UserCard = ({ user }: { user: User }) => {
     const isFriend = user.isFriend;
     const hasPendingRequest = user.hasPendingOutgoingRequest;
     const hasIncomingRequest = user.hasPendingIncomingRequest;

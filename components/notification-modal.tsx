@@ -49,7 +49,7 @@ export function NotificationModal({
 
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      await friendsApi.dismissInvite(invite.inviteId);
+      await friendsApi.dismissRoomInvite(invite.inviteId);
       onDismiss();
     } catch (err) {
       Alert.alert("错误", "拒绝邀请失败");

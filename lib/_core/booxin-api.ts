@@ -9,37 +9,28 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 import * as SecureStore from "expo-secure-store";
 
-// API 基础 URL（支持直连和 HTTPS 反代）
-// 注意：在 Web 预览中，HTTP 会被 Mixed Content 阻止，自签证书会被浏览器拒绝
-// 生产环境应使用有效的 HTTPS 域名或通过服务器反代
-const AUTH_API_BASE = "https://175.178.174.103:5005";
-const ROOM_API_BASE = "https://175.178.174.103:5000";
+// API 基础 URL
+// 支持多个候选地址，按顺序尝试
+const AUTH_API_URLS = [
+  "http://175.178.174.103:5005",
+  "https://175.178.174.103/bbx",
+  "https://boonix.art/bbx",
+];
+
+const ROOM_API_URLS = [
+  "http://175.178.174.103:5000",
+];
+
+// 当前使用的 URL
+let currentAuthUrl = AUTH_API_URLS[0];
+let currentRoomUrl = ROOM_API_URLS[0];
 
 // Token 存储 key
 const TOKEN_STORAGE_KEY = "booxin_access_token";
 const TOKEN_EXPIRY_KEY = "booxin_token_expiry";
 
-// API 响应类型
-export interface ApiResponse<T> {
-  data?: T;
-  message?: string;
-  isValid?: boolean;
-  status?: string;
-  timestamp?: string;
-  version?: string;
-  results?: T[];
-  users?: T[];
-  friends?: T[];
-  incomingRequests?: T[];
-  outgoingRequests?: T[];
-  pendingRoomInvites?: T[];
-  page?: number;
-  pageSize?: number;
-  totalCount?: number;
-  totalPages?: number;
-}
+// ============ 类型定义 ============
 
-// 用户相关类型
 export interface User {
   id: string;
   username: string;
@@ -60,26 +51,24 @@ export interface AuthToken {
   user: User;
 }
 
-// 房间相关类型
 export interface Room {
   id: string;
   roomCode: string;
   hostName: string;
   motd: string;
-  remark: string;
+  remark?: string;
   port: number;
   maxPlayers: number;
   currentPlayers: number;
   isPublic: boolean;
   version: string;
-  modpackUrl: string;
-  modpackGameVersion: string;
-  modpackLoader: string;
+  modpackUrl?: string;
+  modpackGameVersion?: string;
+  modpackLoader?: string;
   createdAt: string;
-  status: "Active" | "Inactive";
+  status: string;
 }
 
-// 好友相关类型
 export interface Friend {
   userId: string;
   username: string;
@@ -117,414 +106,366 @@ export interface FriendsDashboard {
   pendingRoomInvites: RoomInvite[];
 }
 
-export interface LobbyUser extends User {
-  lastLoginAtUtc: string;
-  isOnline: boolean;
-  isInRoom: boolean;
-  isFriend: boolean;
-  hasPendingOutgoingRequest: boolean;
-  hasPendingIncomingRequest: boolean;
-  pendingIncomingRequestId: string | null;
+export interface RoomModpack {
+  roomCode: string;
+  modpackUrl?: string;
+  modpackGameVersion?: string;
+  modpackLoader?: string;
 }
 
-export interface LobbyResponse {
-  users: LobbyUser[];
+export interface RelayNode {
+  address: string;
+  region: string;
+  priority: number;
+  status: string;
+}
+
+export interface PaginatedResponse<T> {
+  results?: T[];
+  users?: T[];
   page: number;
   pageSize: number;
   totalCount: number;
   totalPages: number;
 }
 
-// 创建 Axios 实例
-const createAuthApiClient = (): AxiosInstance => {
-  const client = axios.create({
-    baseURL: AUTH_API_BASE,
+// ============ Token 管理 ============
+
+export const tokenManager = {
+  async saveToken(token: string, expiresAtUtc: string) {
+    try {
+      await SecureStore.setItemAsync(TOKEN_STORAGE_KEY, token);
+      await SecureStore.setItemAsync(TOKEN_EXPIRY_KEY, expiresAtUtc);
+    } catch (error) {
+      console.error("Failed to save token:", error);
+    }
+  },
+
+  async getToken(): Promise<string | null> {
+    try {
+      return await SecureStore.getItemAsync(TOKEN_STORAGE_KEY);
+    } catch (error) {
+      console.error("Failed to get token:", error);
+      return null;
+    }
+  },
+
+  async clearToken() {
+    try {
+      await SecureStore.deleteItemAsync(TOKEN_STORAGE_KEY);
+      await SecureStore.deleteItemAsync(TOKEN_EXPIRY_KEY);
+    } catch (error) {
+      console.error("Failed to clear token:", error);
+    }
+  },
+
+  async isTokenExpired(): Promise<boolean> {
+    try {
+      const expiryStr = await SecureStore.getItemAsync(TOKEN_EXPIRY_KEY);
+      if (!expiryStr) return true;
+      return new Date(expiryStr) <= new Date();
+    } catch (error) {
+      console.error("Failed to check token expiry:", error);
+      return true;
+    }
+  },
+};
+
+// ============ API 实例工厂 ============
+
+const createAxiosInstance = (baseURL: string): AxiosInstance => {
+  const instance = axios.create({
+    baseURL,
+    timeout: 10000,
     headers: {
       "Content-Type": "application/json",
     },
   });
 
-  // 请求拦截器：自动注入 Token
-  client.interceptors.request.use(async (config) => {
-    const token = await SecureStore.getItemAsync(TOKEN_STORAGE_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  });
+  // 请求拦截器：自动添加 Authorization header
+  instance.interceptors.request.use(
+    async (config) => {
+      const token = await tokenManager.getToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
 
   // 响应拦截器：处理错误
-  client.interceptors.response.use(
+  instance.interceptors.response.use(
     (response) => response,
-    (error: AxiosError) => {
+    (error) => {
       if (error.response?.status === 401) {
-        // Token 过期或无效，清除本地存储
-        SecureStore.deleteItemAsync(TOKEN_STORAGE_KEY);
-        SecureStore.deleteItemAsync(TOKEN_EXPIRY_KEY);
+        // Token 过期或无效
+        tokenManager.clearToken();
       }
       return Promise.reject(error);
     }
   );
 
-  return client;
+  return instance;
 };
 
-const createRoomApiClient = (): AxiosInstance => {
-  return axios.create({
-    baseURL: ROOM_API_BASE,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-};
-
-// 创建客户端实例
-const authClient = createAuthApiClient();
-const roomClient = createRoomApiClient();
-
-// ============ 认证 API ============
+// ============ BooxinMultiplayerAuthApi (端口 5005) ============
 
 export const authApi = {
-  /**
-   * 获取 JWT 验签公钥
-   */
   async getPublicKey() {
-    const response = await authClient.get("/api/auth/public-key");
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.get("/api/auth/public-key");
     return response.data;
   },
 
-  /**
-   * 注册
-   */
-  async register(username: string, password: string) {
-    const response = await authClient.post<AuthToken>("/api/auth/register", {
+  async register(username: string, password: string): Promise<AuthToken> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.post("/api/auth/register", {
       username,
       password,
     });
     return response.data;
   },
 
-  /**
-   * 登录
-   */
-  async login(username: string, password: string) {
-    const response = await authClient.post<AuthToken>("/api/auth/login", {
+  async login(username: string, password: string): Promise<AuthToken> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.post("/api/auth/login", {
       username,
       password,
     });
     return response.data;
   },
 
-  /**
-   * 验证 Token
-   */
   async validate(accessToken: string) {
-    const response = await authClient.post("/api/auth/validate", {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.post("/api/auth/validate", {
       accessToken,
     });
     return response.data;
   },
 
-  /**
-   * 获取当前用户信息
-   */
-  async getCurrentUser() {
-    const response = await authClient.get<User>("/api/auth/me");
+  async getCurrentUser(): Promise<User> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.get("/api/auth/me");
     return response.data;
   },
 
-  /**
-   * 修改密码
-   */
-  async changePassword(currentPassword: string, newPassword: string) {
-    const response = await authClient.post("/api/auth/change-password", {
+  async changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.post("/api/auth/change-password", {
       currentPassword,
       newPassword,
     });
     return response.data;
   },
 
-  /**
-   * 搜索用户（加好友用）
-   */
-  async searchUsers(query: string, limit: number = 10) {
-    const response = await authClient.get<{ results: User[] }>(
-      "/api/auth/users/search",
-      {
-        params: { query, limit },
-      }
-    );
+  async searchUsers(
+    query: string,
+    limit: number = 10
+  ): Promise<PaginatedResponse<User>> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.get("/api/auth/users/search", {
+      params: { query, limit },
+    });
     return response.data;
   },
 
-  /**
-   * 获取用户大厅（分页）
-   */
   async getLobbyUsers(
     page: number = 1,
     pageSize: number = 30,
     onlineOnly: boolean = false,
     query: string = ""
-  ) {
-    const response = await authClient.get<LobbyResponse>(
-      "/api/auth/users/lobby",
-      {
-        params: { page, pageSize, onlineOnly, query },
-      }
-    );
+  ): Promise<PaginatedResponse<User>> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.get("/api/auth/users/lobby", {
+      params: { page, pageSize, onlineOnly, query },
+    });
     return response.data;
   },
 };
 
-// ============ 好友 API ============
+// ============ Friends API (端口 5005) ============
 
 export const friendsApi = {
-  /**
-   * 获取好友面板（好友/申请/邀请）
-   */
-  async getDashboard() {
-    const response = await authClient.get<FriendsDashboard>("/api/friends");
+  async getFriendsDashboard(): Promise<FriendsDashboard> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.get("/api/friends");
     return response.data;
   },
 
-  /**
-   * 发送好友申请
-   */
-  async sendRequest(targetUserIdOrUsername: string) {
-    const isUuid =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        targetUserIdOrUsername
-      );
-
-    const payload = isUuid
-      ? { targetUserId: targetUserIdOrUsername }
-      : { username: targetUserIdOrUsername };
-
-    const response = await authClient.post("/api/friends/request", payload);
+  async sendFriendRequest(
+    targetUserId?: string,
+    username?: string
+  ): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const payload = targetUserId ? { targetUserId } : { username };
+    const response = await instance.post("/api/friends/request", payload);
     return response.data;
   },
 
-  /**
-   * 同意好友申请
-   */
-  async acceptRequest(requestId: string) {
-    const response = await authClient.post(
+  async acceptFriendRequest(requestId: string): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.post(
       `/api/friends/requests/${requestId}/accept`
     );
     return response.data;
   },
 
-  /**
-   * 拒绝好友申请
-   */
-  async rejectRequest(requestId: string) {
-    const response = await authClient.post(
+  async rejectFriendRequest(requestId: string): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.post(
       `/api/friends/requests/${requestId}/reject`
     );
     return response.data;
   },
 
-  /**
-   * 删除好友
-   */
-  async removeFriend(friendUserId: string) {
-    const response = await authClient.delete(`/api/friends/${friendUserId}`);
+  async deleteFriend(friendUserId: string): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.delete(`/api/friends/${friendUserId}`);
     return response.data;
   },
 
-  /**
-   * 上报在线/在房状态
-   */
   async updatePresence(
     roomCode: string | null,
     isInRoom: boolean,
     modpackUrl?: string,
     modpackGameVersion?: string,
     modpackLoader?: string
-  ) {
+  ): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentAuthUrl);
     const payload: any = {
       roomCode,
       isInRoom,
     };
-
     if (modpackUrl) payload.modpackUrl = modpackUrl;
     if (modpackGameVersion) payload.modpackGameVersion = modpackGameVersion;
     if (modpackLoader) payload.modpackLoader = modpackLoader;
 
-    const response = await authClient.post("/api/friends/presence", payload);
+    const response = await instance.post("/api/friends/presence", payload);
     return response.data;
   },
 
-  /**
-   * 查房间整合包信息
-   */
-  async getRoomModpack(roomCode: string) {
-    const response = await authClient.get("/api/friends/room-modpack", {
+  async getRoomModpack(roomCode: string): Promise<RoomModpack> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.get("/api/friends/room-modpack", {
       params: { roomCode },
     });
     return response.data;
   },
 
-  /**
-   * 邀请好友进房
-   */
-  async inviteToRoom(friendUserId: string) {
-    const response = await authClient.post("/api/friends/invites", {
+  async inviteFriend(friendUserId: string): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.post("/api/friends/invites", {
       friendUserId,
     });
     return response.data;
   },
 
-  /**
-   * 处理（忽略）房间邀请
-   */
-  async dismissInvite(inviteId: string) {
-    const response = await authClient.post(
+  async dismissRoomInvite(inviteId: string): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.post(
       `/api/friends/invites/${inviteId}/dismiss`
     );
     return response.data;
   },
 };
 
-// ============ 房间 API ============
+// ============ BooxinApi (端口 5000) ============
 
 export const roomsApi = {
-  /**
-   * 获取公共房间列表
-   */
-  async getPublicRooms() {
-    const response = await roomClient.get<Room[]>("/api/rooms", {
+  async getPublicRooms(): Promise<Room[]> {
+    const instance = createAxiosInstance(currentRoomUrl);
+    const response = await instance.get("/api/rooms", {
       params: { isPublic: true },
     });
     return response.data;
   },
 
-  /**
-   * 获取单个房间详情
-   */
-  async getRoomDetail(roomCode: string) {
-    const response = await roomClient.get<Room>(`/api/rooms/${roomCode}`);
+  async getRoomDetails(roomCode: string): Promise<Room> {
+    const instance = createAxiosInstance(currentRoomUrl);
+    const response = await instance.get(`/api/rooms/${roomCode}`);
     return response.data;
   },
 
-  /**
-   * 创建/更新房间（房主发布）
-   */
   async createOrUpdateRoom(roomData: {
     roomCode: string;
     hostId: string;
     hostName: string;
     motd: string;
-    remark: string;
+    remark?: string;
     port: number;
     maxPlayers: number;
     isPublic: boolean;
     version: string;
-    modpackUrl: string;
-    modpackGameVersion: string;
-    modpackLoader: string;
-  }) {
-    const response = await roomClient.post("/api/rooms", roomData);
+    modpackUrl?: string;
+    modpackGameVersion?: string;
+    modpackLoader?: string;
+  }): Promise<Room> {
+    const instance = createAxiosInstance(currentRoomUrl);
+    const response = await instance.post("/api/rooms", roomData);
     return response.data;
   },
 
-  /**
-   * 解散房间
-   */
-  async deleteRoom(roomCode: string) {
-    const response = await roomClient.delete(`/api/rooms/${roomCode}`);
+  async deleteRoom(roomCode: string): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentRoomUrl);
+    const response = await instance.delete(`/api/rooms/${roomCode}`);
     return response.data;
   },
 
-  /**
-   * 加入房间
-   */
-  async joinRoom(roomCode: string, playerId: string, playerName: string) {
-    const response = await roomClient.post(`/api/rooms/${roomCode}/join`, {
+  async joinRoom(
+    roomCode: string,
+    playerId: string,
+    playerName: string,
+    vendor: string = "BooxinLauncher"
+  ): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentRoomUrl);
+    const response = await instance.post(`/api/rooms/${roomCode}/join`, {
       roomCode,
       playerId,
       playerName,
-      vendor: "BooxinLauncher",
+      vendor,
     });
     return response.data;
   },
 
-  /**
-   * 离开房间
-   */
-  async leaveRoom(roomCode: string, playerId: string) {
-    const response = await roomClient.post(`/api/rooms/${roomCode}/leave`, playerId);
+  async leaveRoom(roomCode: string, playerId: string): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentRoomUrl);
+    const response = await instance.post(`/api/rooms/${roomCode}/leave`, playerId);
     return response.data;
   },
 
-  /**
-   * Ping 房间（保活）
-   */
-  async pingRoom(roomCode: string) {
-    const response = await roomClient.post(`/api/rooms/${roomCode}/ping`);
+  async pingRoom(roomCode: string): Promise<{ message: string }> {
+    const instance = createAxiosInstance(currentRoomUrl);
+    const response = await instance.post(`/api/rooms/${roomCode}/ping`);
     return response.data;
   },
 };
 
-// ============ Relay API ============
+// ============ Relay API (端口 5000) ============
 
 export const relayApi = {
-  /**
-   * 获取官方 Relay 列表
-   */
-  async getRelayList() {
-    const response = await roomClient.get("/api/relay");
+  async getRelayNodes(): Promise<RelayNode[]> {
+    const instance = createAxiosInstance(currentRoomUrl);
+    const response = await instance.get("/api/relay");
     return response.data;
   },
 };
 
-// ============ Token 管理 ============
+// ============ Health Check ============
 
-export const tokenManager = {
-  /**
-   * 保存 Token
-   */
-  async saveToken(token: string, expiresAtUtc: string) {
-    await SecureStore.setItemAsync(TOKEN_STORAGE_KEY, token);
-    await SecureStore.setItemAsync(TOKEN_EXPIRY_KEY, expiresAtUtc);
+export const healthApi = {
+  async checkAuthHealth() {
+    const instance = createAxiosInstance(currentAuthUrl);
+    const response = await instance.get("/api/health");
+    return response.data;
   },
 
-  /**
-   * 获取 Token
-   */
-  async getToken() {
-    return await SecureStore.getItemAsync(TOKEN_STORAGE_KEY);
-  },
-
-  /**
-   * 清除 Token
-   */
-  async clearToken() {
-    await SecureStore.deleteItemAsync(TOKEN_STORAGE_KEY);
-    await SecureStore.deleteItemAsync(TOKEN_EXPIRY_KEY);
-  },
-
-  /**
-   * 检查 Token 是否过期
-   */
-  async isTokenExpired() {
-    const expiryStr = await SecureStore.getItemAsync(TOKEN_EXPIRY_KEY);
-    if (!expiryStr) return true;
-
-    const expiryTime = new Date(expiryStr).getTime();
-    const now = new Date().getTime();
-    return now > expiryTime;
-  },
-
-  /**
-   * 获取 Token 剩余时间（毫秒）
-   */
-  async getTokenRemainingTime() {
-    const expiryStr = await SecureStore.getItemAsync(TOKEN_EXPIRY_KEY);
-    if (!expiryStr) return 0;
-
-    const expiryTime = new Date(expiryStr).getTime();
-    const now = new Date().getTime();
-    return Math.max(0, expiryTime - now);
+  async checkRoomHealth() {
+    const instance = createAxiosInstance(currentRoomUrl);
+    const response = await instance.get("/api/health");
+    return response.data;
   },
 };

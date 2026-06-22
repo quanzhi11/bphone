@@ -44,7 +44,7 @@ export default function FriendsScreen() {
   const fetchFriendsData = useCallback(async () => {
     try {
       setError(null);
-      const data = await friendsApi.getDashboard();
+      const data = await friendsApi.getFriendsDashboard();
       setFriends(data.friends || []);
       setIncomingRequests(data.incomingRequests || []);
       setOutgoingRequests(data.outgoingRequests || []);
@@ -80,7 +80,7 @@ export default function FriendsScreen() {
     async (requestId: string) => {
       try {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        await friendsApi.acceptRequest(requestId);
+        await friendsApi.acceptFriendRequest(requestId);
         await fetchFriendsData();
       } catch (err) {
         Alert.alert("错误", "同意申请失败");
@@ -94,7 +94,7 @@ export default function FriendsScreen() {
     async (requestId: string) => {
       try {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        await friendsApi.rejectRequest(requestId);
+        await friendsApi.rejectFriendRequest(requestId);
         await fetchFriendsData();
       } catch (err) {
         Alert.alert("错误", "拒绝申请失败");
@@ -108,7 +108,7 @@ export default function FriendsScreen() {
     async (inviteId: string) => {
       try {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        await friendsApi.dismissInvite(inviteId);
+        await friendsApi.dismissRoomInvite(inviteId);
         await fetchFriendsData();
       } catch (err) {
         Alert.alert("错误", "处理邀请失败");
@@ -127,7 +127,7 @@ export default function FriendsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await friendsApi.removeFriend(friendUserId);
+              await friendsApi.deleteFriend(friendUserId);
               await fetchFriendsData();
             } catch (err) {
               Alert.alert("错误", "删除好友失败");
