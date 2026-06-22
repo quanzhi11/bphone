@@ -1,5 +1,6 @@
 /**
  * 认证屏幕 - 登录/注册
+ * 采用液态玻璃（Glassmorphism）设计
  */
 
 import React, { useState, useCallback } from "react";
@@ -11,10 +12,13 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  ImageBackground,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/lib/auth-context";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { GlassCard, GlassButton } from "@/components/glassmorphism";
 import * as Haptics from "expo-haptics";
 
 type AuthMode = "login" | "signup";
@@ -67,7 +71,6 @@ export default function AuthScreen() {
         await signUp(username, password);
       }
     } catch (err: any) {
-      // 错误已由 signIn/signUp 处理，这里只处理额外的验证
       console.error("Auth error:", err);
     }
   }, [username, password, confirmPassword, mode, signIn, signUp, clearError]);
@@ -75,118 +78,143 @@ export default function AuthScreen() {
   return (
     <ScreenContainer
       className="flex-1"
-      containerClassName="bg-background"
+      containerClassName="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500"
       edges={["top", "left", "right", "bottom"]}
     >
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        showsVerticalScrollIndicator={false}
+      <LinearGradient
+        colors={["rgba(59, 130, 246, 0.8)", "rgba(147, 51, 234, 0.8)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        className="flex-1"
       >
-        <View className="flex-1 justify-center px-6 py-8">
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          className="flex-1 justify-center px-6"
+        >
           {/* 标题 */}
-          <View className="mb-8 items-center">
-            <Text className="text-4xl font-bold text-foreground mb-2">
-              Booxin
-            </Text>
-            <Text className="text-base text-muted">
-              {mode === "login" ? "登录您的账户" : "创建新账户"}
+          <View className="mb-12 items-center">
+            <Text className="text-5xl font-bold text-white mb-2">Booxin</Text>
+            <Text className="text-lg text-white/80">
+              {mode === "login" ? "欢迎回来" : "加入我们"}
             </Text>
           </View>
 
-          {/* 错误提示 */}
-          {error && (
-            <View className="mb-4 bg-error/10 border border-error rounded-lg p-3">
-              <Text className="text-sm text-error">{error}</Text>
-            </View>
-          )}
+          {/* 液态玻璃卡片 */}
+          <GlassCard className="p-8 mb-6">
+            {/* 错误提示 */}
+            {error && (
+              <View className="bg-red-500/20 border border-red-400/50 rounded-lg p-3 mb-6">
+                <Text className="text-red-200 text-center text-sm">{error}</Text>
+              </View>
+            )}
 
-          {/* 用户名输入 */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              用户名
-            </Text>
-            <TextInput
-              className="w-full bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              placeholder="3-32 字符"
-              placeholderTextColor={colors.muted}
-              value={username}
-              onChangeText={setUsername}
-              editable={!isLoading}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          {/* 密码输入 */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              密码
-            </Text>
-            <TextInput
-              className="w-full bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              placeholder="6-128 字符"
-              placeholderTextColor={colors.muted}
-              value={password}
-              onChangeText={setPassword}
-              editable={!isLoading}
-              secureTextEntry
-            />
-          </View>
-
-          {/* 确认密码输入（仅注册） */}
-          {mode === "signup" && (
-            <View className="mb-6">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                确认密码
+            {/* 用户名输入 */}
+            <View className="mb-4">
+              <Text className="text-white/80 text-sm font-medium mb-2">
+                用户名
               </Text>
               <TextInput
-                className="w-full bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                placeholder="再次输入密码"
-                placeholderTextColor={colors.muted}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                placeholder="输入用户名"
+                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                value={username}
+                onChangeText={setUsername}
                 editable={!isLoading}
-                secureTextEntry
+                className="bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white"
+                style={{
+                  color: "white",
+                  borderColor: "rgba(255, 255, 255, 0.2)",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                }}
               />
             </View>
-          )}
 
-          {/* 提交按钮 */}
-          <TouchableOpacity
-            onPress={handleSubmit}
-            disabled={isLoading}
-            style={{
-              transform: [{ scale: isLoading ? 1 : 1 }],
-            }}
-            activeOpacity={0.8}
-          >
-            <View className="w-full bg-primary rounded-lg py-3 items-center justify-center flex-row">
-              {isLoading && (
-                <ActivityIndicator
-                  color={colors.background}
-                  size="small"
-                  style={{ marginRight: 8 }}
-                />
-              )}
-              <Text className="text-base font-semibold text-background">
-                {mode === "login" ? "登录" : "注册"}
+            {/* 密码输入 */}
+            <View className="mb-4">
+              <Text className="text-white/80 text-sm font-medium mb-2">
+                密码
               </Text>
+              <TextInput
+                placeholder="输入密码"
+                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                editable={!isLoading}
+                className="bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white"
+                style={{
+                  color: "white",
+                  borderColor: "rgba(255, 255, 255, 0.2)",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                }}
+              />
             </View>
-          </TouchableOpacity>
 
-          {/* 切换模式 */}
-          <View className="mt-6 flex-row justify-center items-center">
-            <Text className="text-sm text-muted">
-              {mode === "login" ? "还没有账户？" : "已有账户？"}
-            </Text>
-            <TouchableOpacity onPress={handleToggleMode} disabled={isLoading}>
-              <Text className="text-sm font-semibold text-primary ml-2">
-                {mode === "login" ? "注册" : "登录"}
-              </Text>
+            {/* 确认密码（注册模式） */}
+            {mode === "signup" && (
+              <View className="mb-6">
+                <Text className="text-white/80 text-sm font-medium mb-2">
+                  确认密码
+                </Text>
+                <TextInput
+                  placeholder="再次输入密码"
+                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  editable={!isLoading}
+                  className="bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white"
+                  style={{
+                    color: "white",
+                    borderColor: "rgba(255, 255, 255, 0.2)",
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  }}
+                />
+              </View>
+            )}
+
+            {/* 提交按钮 */}
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#60A5FA", "#A78BFA"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                className="rounded-lg py-3 items-center justify-center"
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text className="text-white font-bold text-base">
+                    {mode === "login" ? "登录" : "注册"}
+                  </Text>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
+
+            {/* 切换模式 */}
+            <View className="flex-row items-center justify-center mt-6">
+              <Text className="text-white/70 text-sm">
+                {mode === "login" ? "没有账户？" : "已有账户？"}
+              </Text>
+              <TouchableOpacity onPress={handleToggleMode} disabled={isLoading}>
+                <Text className="text-blue-300 font-semibold text-sm ml-2">
+                  {mode === "login" ? "立即注册" : "返回登录"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </GlassCard>
+
+          {/* 底部提示 */}
+          <Text className="text-white/60 text-xs text-center">
+            {mode === "login"
+              ? "首次使用？注册新账户开始游戏"
+              : "注册后即可加入联机大厅"}
+          </Text>
+        </ScrollView>
+      </LinearGradient>
     </ScreenContainer>
   );
 }

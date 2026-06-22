@@ -1,328 +1,132 @@
 /**
- * 账户屏幕
- * 
- * 用户信息、修改密码、通知设置、登出
+ * 账户屏幕 - 液态玻璃设计
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
-  Alert,
-  TextInput,
   Switch,
+  Alert,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { ScreenContainer } from "@/components/screen-container";
-import { useColors } from "@/hooks/use-colors";
+import { GlassCard } from "@/components/glassmorphism";
 import { useAuth } from "@/lib/auth-context";
-import { authApi } from "@/lib/_core/booxin-api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Haptics from "expo-haptics";
-
-type NotificationMode = "popup" | "background" | "disabled";
 
 export default function AccountScreen() {
-  const colors = useColors();
   const { state, signOut } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [notificationMode, setNotificationMode] = useState<NotificationMode>(
-    "popup"
-  );
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(true);
+  const [notificationMode, setNotificationMode] = useState("popup");
 
-  // 加载通知设置
-  useEffect(() => {
-    const loadNotificationSettings = async () => {
-      try {
-        const saved = await AsyncStorage.getItem("notification_mode");
-        if (saved) {
-          setNotificationMode(saved as NotificationMode);
-        }
-      } catch (err) {
-        console.error("Load notification settings error:", err);
-      }
-    };
+  const handleToggleNotifications = async (value: boolean) => {
+    setShowNotifications(value);
+    await AsyncStorage.setItem("notification_enabled", JSON.stringify(value));
+  };
 
-    loadNotificationSettings();
-  }, []);
+  const handleChangeNotificationMode = async (mode: string) => {
+    setNotificationMode(mode);
+    await AsyncStorage.setItem("notification_mode", mode);
+  };
 
-  // 保存通知设置
-  const saveNotificationSettings = useCallback(
-    async (mode: NotificationMode) => {
-      try {
-        await AsyncStorage.setItem("notification_mode", mode);
-        setNotificationMode(mode);
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch (err) {
-        Alert.alert("错误", "保存设置失败");
-      }
-    },
-    []
-  );
-
-  // 修改密码
-  const handleChangePassword = useCallback(async () => {
-    try {
-      if (!currentPassword.trim()) {
-        Alert.alert("错误", "请输入当前密码");
-        return;
-      }
-
-      if (!newPassword.trim()) {
-        Alert.alert("错误", "请输入新密码");
-        return;
-      }
-
-      if (newPassword !== confirmPassword) {
-        Alert.alert("错误", "两次输入的新密码不一致");
-        return;
-      }
-
-      if (newPassword.length < 6) {
-        Alert.alert("错误", "新密码至少需要 6 个字符");
-        return;
-      }
-
-      setIsLoading(true);
-      await authApi.changePassword(currentPassword, newPassword);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      Alert.alert("成功", "密码已更新");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setIsChangingPassword(false);
-    } catch (err: any) {
-      const message =
-        err.response?.data?.message || err.message || "修改密码失败";
-      Alert.alert("错误", message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPassword, newPassword, confirmPassword]);
-
-  // 登出
-  const handleSignOut = useCallback(() => {
-    Alert.alert("登出", "确定要登出吗？", [
+  const handleLogout = async () => {
+    Alert.alert("退出登录", "确定要退出登录吗？", [
       { text: "取消", style: "cancel" },
       {
-        text: "登出",
+        text: "退出",
         style: "destructive",
         onPress: async () => {
-          try {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await signOut();
-          } catch (err) {
-            Alert.alert("错误", "登出失败");
-          }
+          await signOut();
         },
       },
     ]);
-  }, [signOut]);
+  };
 
   return (
-    <ScreenContainer className="flex-1 p-4">
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* 用户信息 */}
-        <View className="bg-surface border border-border rounded-lg p-4 mb-6">
-          <Text className="text-lg font-bold text-foreground mb-4">
-            账户信息
-          </Text>
-          <View className="mb-3">
-            <Text className="text-sm text-muted mb-1">用户名</Text>
-            <Text className="text-base font-semibold text-foreground">
-              {state.user?.username || "未知"}
-            </Text>
-          </View>
-          <View className="mb-3">
-            <Text className="text-sm text-muted mb-1">账户创建时间</Text>
-            <Text className="text-base text-foreground">
-              {state.user?.createdAtUtc
-                ? new Date(state.user.createdAtUtc).toLocaleDateString()
-                : "未知"}
-            </Text>
-          </View>
-          <View>
-            <Text className="text-sm text-muted mb-1">用户 ID</Text>
-            <Text className="text-xs text-muted font-mono">
-              {state.user?.id || "未知"}
-            </Text>
-          </View>
-        </View>
-
-        {/* 修改密码 */}
-        <View className="bg-surface border border-border rounded-lg p-4 mb-6">
-          <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-lg font-bold text-foreground">
-              修改密码
-            </Text>
-            {!isChangingPassword && (
-              <TouchableOpacity
-                onPress={() => setIsChangingPassword(true)}
-                className="px-3 py-1 bg-primary rounded"
-              >
-                <Text className="text-sm font-semibold text-background">
-                  修改
-                </Text>
-              </TouchableOpacity>
+    <LinearGradient
+      colors={["rgba(59, 130, 246, 0.6)", "rgba(147, 51, 234, 0.6)"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      className="flex-1"
+    >
+      <ScreenContainer className="flex-1 px-4 pt-4">
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* 用户信息 */}
+          <View className="mb-6">
+            <Text className="text-white text-3xl font-bold">账户</Text>
+            {state.user && (
+              <Text className="text-white/60 text-sm mt-2">
+                {state.user.username}
+              </Text>
             )}
           </View>
 
-          {isChangingPassword && (
-            <>
-              <View className="mb-3">
-                <Text className="text-sm text-muted mb-1">当前密码</Text>
-                <TextInput
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground"
-                  placeholder="输入当前密码"
-                  placeholderTextColor={colors.muted}
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  editable={!isLoading}
-                  secureTextEntry
-                />
-              </View>
+          {/* 通知设置 */}
+          <GlassCard className="mb-4 p-4">
+            <Text className="text-white font-bold text-lg mb-4">通知设置</Text>
 
-              <View className="mb-3">
-                <Text className="text-sm text-muted mb-1">新密码</Text>
-                <TextInput
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground"
-                  placeholder="输入新密码"
-                  placeholderTextColor={colors.muted}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  editable={!isLoading}
-                  secureTextEntry
-                />
-              </View>
+            {/* 启用通知 */}
+            <View className="flex-row justify-between items-center mb-4 pb-4 border-b border-white/10">
+              <Text className="text-white">启用通知</Text>
+              <Switch
+                value={showNotifications}
+                onValueChange={handleToggleNotifications}
+                trackColor={{
+                  false: "rgba(255,255,255,0.2)",
+                  true: "rgba(59,130,246,0.5)",
+                }}
+                thumbColor={showNotifications ? "#60A5FA" : "#9CA3AF"}
+              />
+            </View>
 
-              <View className="mb-4">
-                <Text className="text-sm text-muted mb-1">确认新密码</Text>
-                <TextInput
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-foreground"
-                  placeholder="再次输入新密码"
-                  placeholderTextColor={colors.muted}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  editable={!isLoading}
-                  secureTextEntry
-                />
-              </View>
-
-              <View className="flex-row gap-2">
-                <TouchableOpacity
-                  onPress={() => {
-                    setIsChangingPassword(false);
-                    setCurrentPassword("");
-                    setNewPassword("");
-                    setConfirmPassword("");
-                  }}
-                  disabled={isLoading}
-                  className="flex-1 bg-muted/10 border border-muted rounded-lg py-2 items-center"
-                >
-                  <Text className="text-muted font-semibold">取消</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleChangePassword}
-                  disabled={isLoading}
-                  className="flex-1 bg-primary rounded-lg py-2 items-center"
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color={colors.background} />
-                  ) : (
-                    <Text className="text-background font-semibold">
-                      保存
+            {/* 通知方式 */}
+            {showNotifications && (
+              <View>
+                <Text className="text-white/80 text-sm mb-3">通知方式:</Text>
+                {["popup", "background", "silent"].map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    onPress={() => handleChangeNotificationMode(mode)}
+                    className={`flex-row items-center p-3 rounded-lg mb-2 ${
+                      notificationMode === mode
+                        ? "bg-blue-500/30 border border-blue-400"
+                        : "bg-white/5 border border-white/10"
+                    }`}
+                  >
+                    <View
+                      className={`w-4 h-4 rounded-full mr-3 ${
+                        notificationMode === mode
+                          ? "bg-blue-400"
+                          : "bg-white/30"
+                      }`}
+                    />
+                    <Text className="text-white text-sm">
+                      {mode === "popup"
+                        ? "弹窗通知"
+                        : mode === "background"
+                          ? "后台通知"
+                          : "静默通知"}
                     </Text>
-                  )}
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                ))}
               </View>
-            </>
-          )}
-        </View>
+            )}
+          </GlassCard>
 
-        {/* 通知设置 */}
-        <View className="bg-surface border border-border rounded-lg p-4 mb-6">
-          <Text className="text-lg font-bold text-foreground mb-4">
-            通知设置
-          </Text>
+          {/* 退出登录 */}
+          <TouchableOpacity
+            onPress={handleLogout}
+            className="bg-red-500/50 rounded-lg py-3 items-center mt-6"
+          >
+            <Text className="text-white font-bold text-base">退出登录</Text>
+          </TouchableOpacity>
 
-          <View className="mb-4">
-            <View className="flex-row justify-between items-center mb-3">
-              <Text className="text-base font-semibold text-foreground">
-                弹窗提醒
-              </Text>
-              <Switch
-                value={notificationMode === "popup"}
-                onValueChange={() =>
-                  saveNotificationSettings(
-                    notificationMode === "popup" ? "disabled" : "popup"
-                  )
-                }
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.background}
-              />
-            </View>
-            <Text className="text-sm text-muted">
-              在 App 前台时显示邀请通知
-            </Text>
-          </View>
-
-          <View className="mb-4">
-            <View className="flex-row justify-between items-center mb-3">
-              <Text className="text-base font-semibold text-foreground">
-                后台弹出
-              </Text>
-              <Switch
-                value={notificationMode === "background"}
-                onValueChange={() =>
-                  saveNotificationSettings(
-                    notificationMode === "background" ? "disabled" : "background"
-                  )
-                }
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.background}
-              />
-            </View>
-            <Text className="text-sm text-muted">
-              在系统通知栏显示邀请通知
-            </Text>
-          </View>
-
-          <View>
-            <View className="flex-row justify-between items-center mb-3">
-              <Text className="text-base font-semibold text-foreground">
-                关闭通知
-              </Text>
-              <Switch
-                value={notificationMode === "disabled"}
-                onValueChange={() =>
-                  saveNotificationSettings(
-                    notificationMode === "disabled" ? "popup" : "disabled"
-                  )
-                }
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.background}
-              />
-            </View>
-            <Text className="text-sm text-muted">
-              禁用所有邀请通知
-            </Text>
-          </View>
-        </View>
-
-        {/* 登出按钮 */}
-        <TouchableOpacity
-          onPress={handleSignOut}
-          className="bg-error/10 border border-error rounded-lg py-3 items-center mb-8"
-        >
-          <Text className="text-error font-semibold">登出</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </ScreenContainer>
+          <View className="h-8" />
+        </ScrollView>
+      </ScreenContainer>
+    </LinearGradient>
   );
 }
