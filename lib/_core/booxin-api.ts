@@ -11,19 +11,41 @@ import * as SecureStore from "expo-secure-store";
 
 // API 基础 URL
 // 支持多个候选地址，按顺序尝试
+// 优先使用 HTTPS 反代地址（有效证书），备用 HTTP 直连
 const AUTH_API_URLS = [
-  "http://175.178.174.103:5005",
-  "https://175.178.174.103/bbx",
   "https://boonix.art/bbx",
+  "https://175.178.174.103/bbx",
+  "http://175.178.174.103:5005",
 ];
 
 const ROOM_API_URLS = [
-  "http://175.178.174.103:5000",
+  "http://175.178.174.103:5000",  // 房间 API 没有 HTTPS 反代，使用 HTTP 直连
 ];
 
-// 当前使用的 URL
+// 当前使用的 URL（默认使用第一个）
 let currentAuthUrl = AUTH_API_URLS[0];
 let currentRoomUrl = ROOM_API_URLS[0];
+
+// URL 切换函数（如果某个 URL 失败，自动尝试下一个）
+export const switchAuthUrl = () => {
+  const currentIndex = AUTH_API_URLS.indexOf(currentAuthUrl);
+  if (currentIndex < AUTH_API_URLS.length - 1) {
+    currentAuthUrl = AUTH_API_URLS[currentIndex + 1];
+    console.log(`[API] Switched Auth URL to: ${currentAuthUrl}`);
+    return true;
+  }
+  return false;
+};
+
+export const switchRoomUrl = () => {
+  const currentIndex = ROOM_API_URLS.indexOf(currentRoomUrl);
+  if (currentIndex < ROOM_API_URLS.length - 1) {
+    currentRoomUrl = ROOM_API_URLS[currentIndex + 1];
+    console.log(`[API] Switched Room URL to: ${currentRoomUrl}`);
+    return true;
+  }
+  return false;
+};
 
 // Token 存储 key
 const TOKEN_STORAGE_KEY = "booxin_access_token";
