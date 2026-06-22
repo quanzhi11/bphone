@@ -61,15 +61,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="account"
-        options={{
-          title: "账户",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="person.fill" color={color} />
-          ),
-        }}
-      />
+
     </Tabs>
   );
 }
