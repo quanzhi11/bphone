@@ -20,12 +20,17 @@ SplashScreen.preventAutoHideAsync();
 function RootLayoutNav() {
   const { state } = useAuth();
 
+  // 仍在加载中，显示空屏幕
+  if (state.isLoading) {
+    return <Stack />;
+  }
+
   return (
     <Stack>
       {state.userToken == null ? (
         // 认证栈
         <Stack.Screen
-          name="auth"
+          name="auth/index"
           options={{
             headerShown: false,
           }}

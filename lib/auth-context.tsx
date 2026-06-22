@@ -111,7 +111,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: "SIGN_OUT" });
         }
       } catch (e) {
+        console.error("Auth bootstrap error:", e);
         dispatch({ type: "SIGN_OUT" });
+      } finally {
+        // 确保总是结束加载状态
+        dispatch({ type: "SET_LOADING", payload: false });
       }
     };
 

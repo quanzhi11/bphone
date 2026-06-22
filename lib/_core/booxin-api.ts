@@ -8,6 +8,8 @@
 
 import axios, { AxiosInstance, AxiosError } from "axios";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // API 基础 URL
 // 支持多个候选地址，按顺序尝试
@@ -156,8 +158,13 @@ export interface PaginatedResponse<T> {
 export const tokenManager = {
   async saveToken(token: string, expiresAtUtc: string) {
     try {
-      await SecureStore.setItemAsync(TOKEN_STORAGE_KEY, token);
-      await SecureStore.setItemAsync(TOKEN_EXPIRY_KEY, expiresAtUtc);
+      if (Platform.OS === "web") {
+        await AsyncStorage.setItem(TOKEN_STORAGE_KEY, token);
+        await AsyncStorage.setItem(TOKEN_EXPIRY_KEY, expiresAtUtc);
+      } else {
+        await SecureStore.setItemAsync(TOKEN_STORAGE_KEY, token);
+        await SecureStore.setItemAsync(TOKEN_EXPIRY_KEY, expiresAtUtc);
+      }
     } catch (error) {
       console.error("Failed to save token:", error);
     }
@@ -165,7 +172,11 @@ export const tokenManager = {
 
   async getToken(): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync(TOKEN_STORAGE_KEY);
+      if (Platform.OS === "web") {
+        return await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
+      } else {
+        return await SecureStore.getItemAsync(TOKEN_STORAGE_KEY);
+      }
     } catch (error) {
       console.error("Failed to get token:", error);
       return null;
@@ -174,8 +185,13 @@ export const tokenManager = {
 
   async clearToken() {
     try {
-      await SecureStore.deleteItemAsync(TOKEN_STORAGE_KEY);
-      await SecureStore.deleteItemAsync(TOKEN_EXPIRY_KEY);
+      if (Platform.OS === "web") {
+        await AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
+        await AsyncStorage.removeItem(TOKEN_EXPIRY_KEY);
+      } else {
+        await SecureStore.deleteItemAsync(TOKEN_STORAGE_KEY);
+        await SecureStore.deleteItemAsync(TOKEN_EXPIRY_KEY);
+      }
     } catch (error) {
       console.error("Failed to clear token:", error);
     }
@@ -183,7 +199,12 @@ export const tokenManager = {
 
   async isTokenExpired(): Promise<boolean> {
     try {
-      const expiryStr = await SecureStore.getItemAsync(TOKEN_EXPIRY_KEY);
+      let expiryStr: string | null = null;
+      if (Platform.OS === "web") {
+        expiryStr = await AsyncStorage.getItem(TOKEN_EXPIRY_KEY);
+      } else {
+        expiryStr = await SecureStore.getItemAsync(TOKEN_EXPIRY_KEY);
+      }
       if (!expiryStr) return true;
       return new Date(expiryStr) <= new Date();
     } catch (error) {
