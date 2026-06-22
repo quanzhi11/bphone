@@ -12,7 +12,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassCard } from "@/components/glassmorphism";
 import { useColors } from "@/hooks/use-colors";
@@ -94,42 +94,38 @@ export default function HomeScreen() {
   );
 
   return (
-    <LinearGradient
-      colors={["rgba(59, 130, 246, 0.6)", "rgba(147, 51, 234, 0.6)"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      className="flex-1"
+    <ScreenContainer 
+      className="flex-1 px-4 pt-4" 
+      containerClassName="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-400"
     >
-      <ScreenContainer className="flex-1 px-4 pt-4">
-        {/* 标题 */}
-        <View className="mb-6">
-          <Text className="text-white text-3xl font-bold">公共房间</Text>
-          <Text className="text-white/60 text-sm">发现并加入精彩房间</Text>
-        </View>
+      {/* 标题 */}
+      <View className="mb-6">
+        <Text className="text-white text-3xl font-bold">公共房间</Text>
+        <Text className="text-white/60 text-sm">发现并加入精彩房间</Text>
+      </View>
 
-        {/* 房间列表 */}
-        {loading && !refreshing ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="white" />
-          </View>
-        ) : (
-          <FlatList
-            data={rooms}
-            renderItem={renderRoomCard}
-            keyExtractor={(item) => item.id}
-            ListEmptyComponent={renderEmptyState}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor="white"
-              />
-            }
-            scrollEnabled={true}
-            nestedScrollEnabled={true}
-          />
-        )}
-      </ScreenContainer>
-    </LinearGradient>
+      {/* 房间列表 */}
+      {loading && !refreshing ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="white" />
+        </View>
+      ) : (
+        <FlatList
+          data={rooms}
+          renderItem={renderRoomCard}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={renderEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="white"
+            />
+          }
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
+        />
+      )}
+    </ScreenContainer>
   );
 }

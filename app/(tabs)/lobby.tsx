@@ -11,7 +11,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassCard } from "@/components/glassmorphism";
 import { authApi, friendsApi, type User } from "@/lib/_core/booxin-api";
@@ -76,13 +76,7 @@ export default function LobbyScreen() {
   );
 
   return (
-    <LinearGradient
-      colors={["rgba(59, 130, 246, 0.6)", "rgba(147, 51, 234, 0.6)"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      className="flex-1"
-    >
-      <ScreenContainer className="flex-1 px-4 pt-4">
+    <ScreenContainer className="flex-1 px-4 pt-4" containerClassName="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-400">
         <View className="mb-6">
           <Text className="text-white text-3xl font-bold">用户大厅</Text>
           <Text className="text-white/60 text-sm">发现并添加新好友</Text>
@@ -120,6 +114,5 @@ export default function LobbyScreen() {
           />
         )}
       </ScreenContainer>
-    </LinearGradient>
   );
 }

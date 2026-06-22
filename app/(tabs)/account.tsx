@@ -12,7 +12,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassCard } from "@/components/glassmorphism";
 import { useAuth } from "@/lib/auth-context";
@@ -81,13 +81,7 @@ export default function AccountScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={["rgba(59, 130, 246, 0.6)", "rgba(147, 51, 234, 0.6)"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      className="flex-1"
-    >
-      <ScreenContainer className="flex-1 px-4 pt-4">
+    <ScreenContainer className="flex-1 px-4 pt-4" containerClassName="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-400">
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* 用户信息 */}
           <View className="mb-6">
@@ -216,6 +210,5 @@ export default function AccountScreen() {
           <View className="h-8" />
         </ScrollView>
       </ScreenContainer>
-    </LinearGradient>
   );
 }

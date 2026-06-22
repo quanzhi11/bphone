@@ -14,7 +14,7 @@ import {
   Alert,
   ImageBackground,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+
 import { useAuth } from "@/lib/auth-context";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
@@ -81,13 +81,7 @@ export default function AuthScreen() {
       containerClassName="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500"
       edges={["top", "left", "right", "bottom"]}
     >
-      <LinearGradient
-        colors={["rgba(59, 130, 246, 0.8)", "rgba(147, 51, 234, 0.8)"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        className="flex-1"
-      >
-        <ScrollView
+      <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           className="flex-1 justify-center px-6"
         >
@@ -177,21 +171,15 @@ export default function AuthScreen() {
               onPress={handleSubmit}
               disabled={isLoading}
               activeOpacity={0.8}
+              className="bg-gradient-to-r from-blue-400 to-purple-400 rounded-lg py-3 items-center justify-center"
             >
-              <LinearGradient
-                colors={["#60A5FA", "#A78BFA"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                className="rounded-lg py-3 items-center justify-center"
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text className="text-white font-bold text-base">
-                    {mode === "login" ? "登录" : "注册"}
-                  </Text>
-                )}
-              </LinearGradient>
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text className="text-white font-bold text-base">
+                  {mode === "login" ? "登录" : "注册"}
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* 切换模式 */}
@@ -214,7 +202,6 @@ export default function AuthScreen() {
               : "注册后即可加入联机大厅"}
           </Text>
         </ScrollView>
-      </LinearGradient>
     </ScreenContainer>
   );
 }
