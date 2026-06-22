@@ -1,42 +1,36 @@
 /**
  * 液态玻璃（Glassmorphism）组件库
  * 
- * 提供带有模糊背景、半透明效果的卡片和容器
+ * 提供半透明效果的卡片和容器（不依赖 expo-blur）
  */
 
 import React from "react";
 import { View, ViewProps } from "react-native";
-import { BlurView } from "expo-blur";
-import { useColors } from "@/hooks/use-colors";
 import { cn } from "@/lib/utils";
 
 /**
- * 液态玻璃卡片 - 带模糊背景效果
+ * 液态玻璃卡片 - 半透明效果
  */
 export function GlassCard({
   children,
   className,
-  intensity = 90,
   ...props
-}: ViewProps & { intensity?: number }) {
-  const colors = useColors();
-
+}: ViewProps) {
   return (
-    <BlurView intensity={intensity}>
-      <View
-        className={cn(
-          "rounded-2xl border border-white/20 overflow-hidden",
-          className
-        )}
-        style={{
-          backgroundColor: "rgba(255, 255, 255, 0.1)",
-          borderColor: "rgba(255, 255, 255, 0.2)",
-        }}
-        {...props}
-      >
-        {children}
-      </View>
-    </BlurView>
+    <View
+      className={cn(
+        "rounded-2xl border overflow-hidden",
+        className
+      )}
+      style={{
+        backgroundColor: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(255, 255, 255, 0.2)",
+        borderWidth: 1,
+      }}
+      {...props}
+    >
+      {children}
+    </View>
   );
 }
 
@@ -46,21 +40,18 @@ export function GlassCard({
 export function GlassContainer({
   children,
   className,
-  intensity = 80,
   ...props
-}: ViewProps & { intensity?: number }) {
+}: ViewProps) {
   return (
-    <BlurView intensity={intensity}>
-      <View
-        className={cn("flex-1", className)}
-        style={{
-          backgroundColor: "rgba(255, 255, 255, 0.05)",
-        }}
-        {...props}
-      >
-        {children}
-      </View>
-    </BlurView>
+    <View
+      className={cn("flex-1", className)}
+      style={{
+        backgroundColor: "rgba(255, 255, 255, 0.05)",
+      }}
+      {...props}
+    >
+      {children}
+    </View>
   );
 }
 
@@ -76,12 +67,13 @@ export function GlassInput({
   return (
     <View
       className={cn(
-        "rounded-xl border border-white/20 px-4 py-3 bg-white/10",
+        "rounded-xl border px-4 py-3",
         className
       )}
       style={{
         borderColor: "rgba(255, 255, 255, 0.2)",
         backgroundColor: "rgba(255, 255, 255, 0.1)",
+        borderWidth: 1,
       }}
       {...props}
     />
@@ -94,24 +86,22 @@ export function GlassInput({
 export function GlassButton({
   children,
   className,
-  intensity = 85,
   ...props
-}: ViewProps & { intensity?: number }) {
+}: ViewProps) {
   return (
-    <BlurView intensity={intensity}>
-      <View
-        className={cn(
-          "rounded-xl border border-white/30 px-6 py-3 items-center justify-center",
-          className
-        )}
-        style={{
-          backgroundColor: "rgba(255, 255, 255, 0.15)",
-          borderColor: "rgba(255, 255, 255, 0.3)",
-        }}
-        {...props}
-      >
-        {children}
-      </View>
-    </BlurView>
+    <View
+      className={cn(
+        "rounded-xl border px-6 py-3 items-center justify-center",
+        className
+      )}
+      style={{
+        backgroundColor: "rgba(255, 255, 255, 0.15)",
+        borderColor: "rgba(255, 255, 255, 0.3)",
+        borderWidth: 1,
+      }}
+      {...props}
+    >
+      {children}
+    </View>
   );
 }
