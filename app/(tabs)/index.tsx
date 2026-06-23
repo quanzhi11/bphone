@@ -76,12 +76,9 @@ export default function HomeScreen() {
             <Text className="text-blue-300 text-xs">有整合包</Text>
           )}
         </View>
-        <TouchableOpacity
-          className="bg-blue-500/50 rounded-lg px-4 py-2"
-          activeOpacity={0.7}
-        >
-          <Text className="text-white font-semibold text-sm">加入</Text>
-        </TouchableOpacity>
+        <View className="bg-white/15 rounded-lg px-3 py-2">
+          <Text className="text-white/80 font-medium text-xs">PC 启动器加入</Text>
+        </View>
       </View>
     </GlassCard>
   );
@@ -101,7 +98,7 @@ export default function HomeScreen() {
       {/* 标题 */}
       <View className="mb-6">
         <Text className="text-white text-3xl font-bold">公共房间</Text>
-        <Text className="text-white/60 text-sm">发现并加入精彩房间</Text>
+        <Text className="text-white/60 text-sm">只读浏览，请在 PC 启动器加入房间</Text>
       </View>
 
       {/* 房间列表 */}

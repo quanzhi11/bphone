@@ -6,6 +6,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from "react";
 import { authApi, tokenManager, User, AuthToken } from "@/lib/_core/booxin-api";
+import { resetInviteNotificationState } from "@/lib/invite-notification-poller";
 
 export interface AuthState {
   isLoading: boolean;
@@ -161,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     try {
       await tokenManager.clearToken();
+      await resetInviteNotificationState();
       dispatch({ type: "SIGN_OUT" });
     } catch (error) {
       console.error("Sign out error:", error);

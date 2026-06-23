@@ -86,11 +86,11 @@ export default function AccountScreen() {
           {/* 用户信息 */}
           <View className="mb-6">
             <Text className="text-white text-3xl font-bold">账户</Text>
-            {state.user && (
+            {state.user ? (
               <Text className="text-white/60 text-sm mt-2">
-                {state.user.username}
+                {state.user.username} · 联机通知伴侣
               </Text>
-            )}
+            ) : null}
           </View>
 
           {/* 用户详情卡片 */}

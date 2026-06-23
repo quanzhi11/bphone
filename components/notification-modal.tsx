@@ -1,7 +1,5 @@
 /**
- * 通知弹窗组件 - 仅显示邀请通知，不自动加入
- * 
- * 用户可以同意或拒绝好友邀请，但不会自动加入房间
+ * 联机邀请弹窗 — 手机版仅作通知，不加入房间。
  */
 
 import React, { useCallback } from "react";
@@ -19,40 +17,45 @@ export interface NotificationModalProps {
   visible: boolean;
   invite: RoomInvite | null;
   onDismiss: () => void;
+  onViewInvites?: () => void;
 }
 
 export function NotificationModal({
   visible,
   invite,
   onDismiss,
+  onViewInvites,
 }: NotificationModalProps) {
-  const handleAccept = useCallback(async () => {
-    if (!invite) return;
+  const handleAcknowledge = useCallback(async () => {
+    if (!invite) {
+      return;
+    }
 
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      // 仅记录接受，不自动加入房间
-      Alert.alert("已接受", `已接受来自 ${invite.senderUsername} 的邀请`);
       onDismiss();
-    } catch (err) {
+    } catch {
       Alert.alert("错误", "处理邀请失败");
     }
   }, [invite, onDismiss]);
 
-  const handleReject = useCallback(async () => {
-    if (!invite) return;
+  const handleDismissInvite = useCallback(async () => {
+    if (!invite) {
+      return;
+    }
 
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await friendsApi.dismissRoomInvite(invite.inviteId);
-      Alert.alert("已拒绝", `已拒绝来自 ${invite.senderUsername} 的邀请`);
       onDismiss();
-    } catch (err) {
-      Alert.alert("错误", "拒绝邀请失败");
+    } catch {
+      Alert.alert("错误", "忽略邀请失败");
     }
   }, [invite, onDismiss]);
 
-  if (!invite) return null;
+  if (!invite) {
+    return null;
+  }
 
   return (
     <Modal
@@ -61,7 +64,6 @@ export function NotificationModal({
       animationType="fade"
       onRequestClose={onDismiss}
     >
-      {/* 半透明背景 */}
       <View
         style={{
           flex: 1,
@@ -71,53 +73,62 @@ export function NotificationModal({
           padding: 16,
         }}
       >
-        {/* 通知卡片 */}
         <View
           className="w-full bg-white rounded-2xl p-6 shadow-lg"
           style={{ maxWidth: 320 }}
         >
-          {/* 标题 */}
           <Text className="text-xl font-bold text-gray-900 mb-2">
-            好友邀请
+            联机邀请
           </Text>
 
-          {/* 邀请信息 */}
           <View className="mb-4">
             <Text className="text-base text-gray-700 mb-3">
               <Text className="font-semibold">{invite.senderUsername}</Text>
-              {" "}邀请您加入房间
+              {" "}邀请你加入房间
             </Text>
 
-            {/* 房间信息 */}
             <View className="bg-gray-100 rounded-lg p-3 mb-3">
               <Text className="text-sm font-semibold text-gray-900 mb-1">
                 房间码: {invite.roomCode}
               </Text>
-              {invite.modpackGameVersion && (
+              {invite.modpackGameVersion ? (
                 <Text className="text-xs text-gray-600">
                   {invite.modpackGameVersion} • {invite.modpackLoader}
                 </Text>
-              )}
+              ) : null}
             </View>
 
-            <Text className="text-xs text-gray-500">
+            <Text className="text-xs text-gray-500 mb-2">
               {new Date(invite.createdAtUtc).toLocaleString()}
+            </Text>
+            <Text className="text-xs text-blue-600">
+              请在 PC 版 Booxin 启动器输入房间码加入，手机版不提供进房功能。
             </Text>
           </View>
 
-          {/* 按钮 */}
+          {onViewInvites ? (
+            <TouchableOpacity
+              onPress={onViewInvites}
+              className="bg-gray-100 rounded-lg py-2.5 items-center mb-3"
+            >
+              <Text className="text-gray-700 font-semibold text-sm">
+                查看全部邀请
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
           <View className="flex-row gap-2">
             <TouchableOpacity
-              onPress={handleReject}
+              onPress={handleDismissInvite}
               className="flex-1 bg-gray-200 rounded-lg py-3 items-center"
             >
-              <Text className="text-gray-700 font-semibold">拒绝</Text>
+              <Text className="text-gray-700 font-semibold">忽略</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={handleAccept}
+              onPress={handleAcknowledge}
               className="flex-1 bg-blue-500 rounded-lg py-3 items-center"
             >
-              <Text className="text-white font-semibold">同意</Text>
+              <Text className="text-white font-semibold">知道了</Text>
             </TouchableOpacity>
           </View>
         </View>

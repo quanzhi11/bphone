@@ -1,8 +1,8 @@
 /**
- * 好友列表屏幕 - 包含好友、申请、邀请三个标签
+ * 好友列表 — 好友、申请、联机邀请
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,12 +10,20 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from "react-native";
+import { useFocusEffect } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassCard } from "@/components/glassmorphism";
 import { useAuth } from "@/lib/auth-context";
-import { friendsApi, type FriendsDashboard, type FriendRequest, type RoomInvite } from "@/lib/_core/booxin-api";
+import {
+  friendsApi,
+  type FriendsDashboard,
+  type FriendRequest,
+  type RoomInvite,
+  type Friend,
+} from "@/lib/_core/booxin-api";
 import * as Haptics from "expo-haptics";
 
 export default function FriendsScreen() {
@@ -23,9 +31,12 @@ export default function FriendsScreen() {
   const [tab, setTab] = useState<"friends" | "requests" | "invites">("friends");
   const [data, setData] = useState<FriendsDashboard | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = async () => {
-    if (!state.userToken) return;
+  const fetchData = useCallback(async () => {
+    if (!state.userToken) {
+      return;
+    }
     try {
       setLoading(true);
       const result = await friendsApi.getFriendsDashboard();
@@ -35,11 +46,23 @@ export default function FriendsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [state.userToken]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  }, [fetchData]);
 
   useEffect(() => {
-    fetchData();
-  }, [state.userToken]);
+    void fetchData();
+  }, [fetchData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchData();
+    }, [fetchData])
+  );
 
   const handleAcceptRequest = async (requestId: string) => {
     try {
@@ -47,7 +70,7 @@ export default function FriendsScreen() {
       await friendsApi.acceptFriendRequest(requestId);
       Alert.alert("成功", "已接受好友申请");
       await fetchData();
-    } catch (error) {
+    } catch {
       Alert.alert("错误", "处理申请失败");
     }
   };
@@ -58,7 +81,7 @@ export default function FriendsScreen() {
       await friendsApi.rejectFriendRequest(requestId);
       Alert.alert("成功", "已拒绝好友申请");
       await fetchData();
-    } catch (error) {
+    } catch {
       Alert.alert("错误", "处理申请失败");
     }
   };
@@ -69,29 +92,29 @@ export default function FriendsScreen() {
       await friendsApi.dismissRoomInvite(inviteId);
       Alert.alert("成功", "已忽略邀请");
       await fetchData();
-    } catch (error) {
+    } catch {
       Alert.alert("错误", "处理邀请失败");
     }
   };
 
-  const renderFriend = ({ item }: any) => (
+  const renderFriend = ({ item }: { item: Friend }) => (
     <GlassCard className="mb-3 p-4">
       <View className="flex-row justify-between items-center">
         <View className="flex-1">
           <Text className="text-white font-semibold">{item.username}</Text>
           <Text className="text-white/60 text-xs">
             {item.isOnline ? "🟢 在线" : "⚫ 离线"}
-            {item.isInRoom && ` · 在房间`}
+            {item.isInRoom ? " · 在房间" : ""}
           </Text>
         </View>
       </View>
     </GlassCard>
   );
 
-  const renderRequest = ({ item }: any) => (
+  const renderRequest = ({ item }: { item: FriendRequest }) => (
     <GlassCard className="mb-3 p-4">
       <View className="mb-3">
-        <Text className="text-white font-semibold">{item.senderUsername}</Text>
+        <Text className="text-white font-semibold">{item.username}</Text>
         <Text className="text-white/60 text-xs">请求添加您为好友</Text>
       </View>
       <View className="flex-row gap-2">
@@ -111,7 +134,7 @@ export default function FriendsScreen() {
     </GlassCard>
   );
 
-  const renderInvite = ({ item }: any) => (
+  const renderInvite = ({ item }: { item: RoomInvite }) => (
     <GlassCard className="mb-3 p-4">
       <View className="mb-3">
         <Text className="text-white font-semibold">{item.senderUsername}</Text>
@@ -119,11 +142,14 @@ export default function FriendsScreen() {
         <Text className="text-white text-sm">
           房间码: <Text className="font-mono">{item.roomCode}</Text>
         </Text>
-        {item.modpackGameVersion && (
+        {item.modpackGameVersion ? (
           <Text className="text-white/60 text-xs mt-1">
             {item.modpackGameVersion} • {item.modpackLoader}
           </Text>
-        )}
+        ) : null}
+        <Text className="text-blue-200 text-xs mt-2">
+          请在 PC 启动器输入房间码加入
+        </Text>
       </View>
       <TouchableOpacity
         onPress={() => handleDismissInvite(item.inviteId)}
@@ -134,80 +160,100 @@ export default function FriendsScreen() {
     </GlassCard>
   );
 
-  const friends = data?.friends || [];
-  const requests = data?.incomingRequests || [];
-  const invites = data?.pendingRoomInvites || [];
+  const friends = data?.friends ?? [];
+  const requests = data?.incomingRequests ?? [];
+  const invites = data?.pendingRoomInvites ?? [];
 
   return (
-    <ScreenContainer className="flex-1 px-4 pt-4" containerClassName="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-400">
-        {/* 标签栏 */}
-        <View className="flex-row gap-2 mb-6">
-          {["friends", "requests", "invites"].map((t) => (
-            <TouchableOpacity
-              key={t}
-              onPress={() => setTab(t as any)}
-              className={`flex-1 py-2 rounded-lg ${
-                tab === t
-                  ? "bg-white/30 border border-white"
-                  : "bg-white/10 border border-white/20"
+    <ScreenContainer
+      className="flex-1 px-4 pt-4"
+      containerClassName="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-400"
+    >
+      <View className="flex-row gap-2 mb-6">
+        {(["friends", "requests", "invites"] as const).map((t) => (
+          <TouchableOpacity
+            key={t}
+            onPress={() => setTab(t)}
+            className={`flex-1 py-2 rounded-lg ${
+              tab === t
+                ? "bg-white/30 border border-white"
+                : "bg-white/10 border border-white/20"
+            }`}
+          >
+            <Text
+              className={`text-center font-semibold text-sm ${
+                tab === t ? "text-white" : "text-white/60"
               }`}
             >
-              <Text
-                className={`text-center font-semibold text-sm ${
-                  tab === t ? "text-white" : "text-white/60"
-                }`}
-              >
-                {t === "friends"
-                  ? `好友 (${friends.length})`
-                  : t === "requests"
-                    ? `申请 (${requests.length})`
-                    : `邀请 (${invites.length})`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              {t === "friends"
+                ? `好友 (${friends.length})`
+                : t === "requests"
+                  ? `申请 (${requests.length})`
+                  : `邀请 (${invites.length})`}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-        {/* 内容 */}
-        {loading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="white" />
-          </View>
-        ) : (
-          <FlatList
-            data={
-              tab === "friends"
-                ? friends
-                : tab === "requests"
-                  ? requests
-                  : invites
-            }
-            renderItem={
-              tab === "friends"
-                ? renderFriend
-                : tab === "requests"
-                  ? renderRequest
-                  : renderInvite
-            }
-            keyExtractor={(item: any) =>
-              tab === "friends"
-                ? item.userId
-                : tab === "requests"
-                  ? (item as FriendRequest).requestId
-                  : (item as RoomInvite).inviteId
-            }
-            ListEmptyComponent={
-              <View className="items-center justify-center py-12">
-                <Text className="text-white/60">
-                  {tab === "friends"
-                    ? "暂无好友"
-                    : tab === "requests"
-                      ? "暂无好友申请"
-                      : "暂无邀请"}
-                </Text>
-              </View>
-            }
-          />
-        )}
-      </ScreenContainer>
+      {loading && !refreshing ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="white" />
+        </View>
+      ) : tab === "friends" ? (
+        <FlatList
+          data={friends}
+          renderItem={renderFriend}
+          keyExtractor={(item) => item.userId}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="white"
+            />
+          }
+          ListEmptyComponent={
+            <View className="items-center justify-center py-12">
+              <Text className="text-white/60">暂无好友</Text>
+            </View>
+          }
+        />
+      ) : tab === "requests" ? (
+        <FlatList
+          data={requests}
+          renderItem={renderRequest}
+          keyExtractor={(item) => item.requestId}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="white"
+            />
+          }
+          ListEmptyComponent={
+            <View className="items-center justify-center py-12">
+              <Text className="text-white/60">暂无好友申请</Text>
+            </View>
+          }
+        />
+      ) : (
+        <FlatList
+          data={invites}
+          renderItem={renderInvite}
+          keyExtractor={(item) => item.inviteId}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="white"
+            />
+          }
+          ListEmptyComponent={
+            <View className="items-center justify-center py-12">
+              <Text className="text-white/60">暂无邀请</Text>
+            </View>
+          }
+        />
+      )}
+    </ScreenContainer>
   );
 }

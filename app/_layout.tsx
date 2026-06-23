@@ -9,6 +9,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 
+import { InviteNotificationHost } from "@/components/invite-notification-host";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { NotificationProvider } from "@/lib/notification-context";
@@ -26,25 +27,26 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack>
-      {state.userToken == null ? (
-        // 认证栈
-        <Stack.Screen
-          name="auth/index"
-          options={{
-            headerShown: false,
-          }}
-        />
-      ) : (
-        // 应用栈
-        <Stack.Screen
-          name="(tabs)"
-          options={{
-            headerShown: false,
-          }}
-        />
-      )}
-    </Stack>
+    <>
+      <Stack>
+        {state.userToken == null ? (
+          <Stack.Screen
+            name="auth/index"
+            options={{
+              headerShown: false,
+            }}
+          />
+        ) : (
+          <Stack.Screen
+            name="(tabs)"
+            options={{
+              headerShown: false,
+            }}
+          />
+        )}
+      </Stack>
+      {state.userToken != null ? <InviteNotificationHost /> : null}
+    </>
   );
 }
 

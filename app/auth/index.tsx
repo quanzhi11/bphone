@@ -89,7 +89,10 @@ export default function AuthScreen() {
           <View className="mb-12 items-center">
             <Text className="text-5xl font-bold text-white mb-2">Booxin</Text>
             <Text className="text-lg text-white/80">
-              {mode === "login" ? "欢迎回来" : "加入我们"}
+              {mode === "login" ? "联机通知伴侣 · 欢迎回来" : "联机通知伴侣 · 加入我们"}
+            </Text>
+            <Text className="text-sm text-white/60 mt-2 text-center px-4">
+              与 PC 启动器共用账号，接收联机邀请通知
             </Text>
           </View>
 
