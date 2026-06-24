@@ -18,7 +18,8 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { GlassCard, GlassButton } from "@/components/glassmorphism";
+import { glassColors, glassInputStyle } from "@/lib/glass-theme";
+import { GlassCard, GlassPressable } from "@/components/glassmorphism";
 import * as Haptics from "expo-haptics";
 
 type AuthMode = "login" | "signup";
@@ -78,7 +79,6 @@ export default function AuthScreen() {
   return (
     <ScreenContainer
       className="flex-1"
-      containerClassName="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500"
       edges={["top", "left", "right", "bottom"]}
     >
       <ScrollView
@@ -87,8 +87,10 @@ export default function AuthScreen() {
         >
           {/* 标题 */}
           <View className="mb-12 items-center">
-            <Text className="text-5xl font-bold text-white mb-2">Booxin</Text>
-            <Text className="text-lg text-white/80">
+            <Text className="text-5xl font-bold mb-2" style={{ color: glassColors.text }}>
+              Booxin
+            </Text>
+            <Text className="text-lg" style={{ color: "rgba(242,246,255,0.8)" }}>
               {mode === "login" ? "联机通知伴侣 · 欢迎回来" : "联机通知伴侣 · 加入我们"}
             </Text>
             <Text className="text-sm text-white/60 mt-2 text-center px-4">
@@ -112,16 +114,11 @@ export default function AuthScreen() {
               </Text>
               <TextInput
                 placeholder="输入用户名"
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                placeholderTextColor="rgba(160, 174, 200, 0.8)"
                 value={username}
                 onChangeText={setUsername}
                 editable={!isLoading}
-                className="bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white"
-                style={{
-                  color: "white",
-                  borderColor: "rgba(255, 255, 255, 0.2)",
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
-                }}
+                style={glassInputStyle}
               />
             </View>
 
@@ -132,17 +129,12 @@ export default function AuthScreen() {
               </Text>
               <TextInput
                 placeholder="输入密码"
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                placeholderTextColor="rgba(160, 174, 200, 0.8)"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
                 editable={!isLoading}
-                className="bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white"
-                style={{
-                  color: "white",
-                  borderColor: "rgba(255, 255, 255, 0.2)",
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
-                }}
+                style={glassInputStyle}
               />
             </View>
 
@@ -154,36 +146,31 @@ export default function AuthScreen() {
                 </Text>
                 <TextInput
                   placeholder="再次输入密码"
-                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                  placeholderTextColor="rgba(160, 174, 200, 0.8)"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
                   editable={!isLoading}
-                  className="bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white"
-                  style={{
-                    color: "white",
-                    borderColor: "rgba(255, 255, 255, 0.2)",
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
-                  }}
+                  style={glassInputStyle}
                 />
               </View>
             )}
 
             {/* 提交按钮 */}
-            <TouchableOpacity
+            <GlassPressable
               onPress={handleSubmit}
               disabled={isLoading}
-              activeOpacity={0.8}
-              className="bg-gradient-to-r from-blue-400 to-purple-400 rounded-lg py-3 items-center justify-center"
+              variant="primary"
+              className="mt-2"
             >
               {isLoading ? (
-                <ActivityIndicator color="white" />
+                <ActivityIndicator color={glassColors.text} />
               ) : (
-                <Text className="text-white font-bold text-base">
+                <Text style={{ color: glassColors.text, fontWeight: "700" }}>
                   {mode === "login" ? "登录" : "注册"}
                 </Text>
               )}
-            </TouchableOpacity>
+            </GlassPressable>
 
             {/* 切换模式 */}
             <View className="flex-row items-center justify-center mt-6">
@@ -191,7 +178,7 @@ export default function AuthScreen() {
                 {mode === "login" ? "没有账户？" : "已有账户？"}
               </Text>
               <TouchableOpacity onPress={handleToggleMode} disabled={isLoading}>
-                <Text className="text-blue-300 font-semibold text-sm ml-2">
+                <Text style={{ color: glassColors.accent, fontWeight: "600" }} className="text-sm ml-2">
                   {mode === "login" ? "立即注册" : "返回登录"}
                 </Text>
               </TouchableOpacity>

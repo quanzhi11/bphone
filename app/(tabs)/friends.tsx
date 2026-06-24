@@ -24,6 +24,7 @@ import {
   type RoomInvite,
   type Friend,
 } from "@/lib/_core/booxin-api";
+import { glassColors } from "@/lib/glass-theme";
 import * as Haptics from "expo-haptics";
 
 export default function FriendsScreen() {
@@ -165,32 +166,32 @@ export default function FriendsScreen() {
   const invites = data?.pendingRoomInvites ?? [];
 
   return (
-    <ScreenContainer
-      className="flex-1 px-4 pt-4"
-      containerClassName="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-400"
-    >
+    <ScreenContainer className="flex-1 px-4 pt-4">
       <View className="flex-row gap-2 mb-6">
         {(["friends", "requests", "invites"] as const).map((t) => (
-          <TouchableOpacity
-            key={t}
-            onPress={() => setTab(t)}
-            className={`flex-1 py-2 rounded-lg ${
-              tab === t
-                ? "bg-white/30 border border-white"
-                : "bg-white/10 border border-white/20"
-            }`}
-          >
-            <Text
-              className={`text-center font-semibold text-sm ${
-                tab === t ? "text-white" : "text-white/60"
-              }`}
+          <TouchableOpacity key={t} onPress={() => setTab(t)} className="flex-1">
+            <GlassCard
+              variant="nav"
+              showDispersion={false}
+              className="py-2"
+              style={{
+                opacity: tab === t ? 1 : 0.72,
+                borderColor: tab === t ? glassColors.border : glassColors.borderSubtle,
+              }}
             >
+              <Text
+                className="text-center font-semibold text-sm"
+                style={{
+                  color: tab === t ? glassColors.text : glassColors.textSecondary,
+                }}
+              >
               {t === "friends"
                 ? `好友 (${friends.length})`
                 : t === "requests"
                   ? `申请 (${requests.length})`
                   : `邀请 (${invites.length})`}
             </Text>
+            </GlassCard>
           </TouchableOpacity>
         ))}
       </View>

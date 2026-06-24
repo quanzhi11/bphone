@@ -94,28 +94,45 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // 初始化：尝试恢复 Token
+  // 初始化：尝试恢复 Token 并拉取用户信息（与 PC 端联机认证一致）
   useEffect(() => {
     const bootstrapAsync = async () => {
       try {
         const token = await tokenManager.getToken();
-        if (token) {
-          const isExpired = await tokenManager.isTokenExpired();
-          if (!isExpired) {
-            dispatch({ type: "RESTORE_TOKEN", payload: token });
-          } else {
-            // Token 已过期，清除
-            await tokenManager.clearToken();
-            dispatch({ type: "SIGN_OUT" });
-          }
-        } else {
+        if (!token) {
+          dispatch({ type: "SIGN_OUT" });
+          return;
+        }
+
+        const isExpired = await tokenManager.isTokenExpired();
+        if (isExpired) {
+          await tokenManager.clearToken();
+          dispatch({ type: "SIGN_OUT" });
+          return;
+        }
+
+        const expiresAtUtc =
+          (await tokenManager.getTokenExpiry()) ?? new Date().toISOString();
+
+        try {
+          const user = await authApi.getCurrentUser();
+          dispatch({
+            type: "SIGN_IN",
+            payload: {
+              accessToken: token,
+              tokenType: "Bearer",
+              expiresAtUtc,
+              user,
+            },
+          });
+        } catch {
+          await tokenManager.clearToken();
           dispatch({ type: "SIGN_OUT" });
         }
       } catch (e) {
         console.error("Auth bootstrap error:", e);
         dispatch({ type: "SIGN_OUT" });
       } finally {
-        // 确保总是结束加载状态
         dispatch({ type: "SET_LOADING", payload: false });
       }
     };

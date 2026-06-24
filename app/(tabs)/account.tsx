@@ -81,7 +81,7 @@ export default function AccountScreen() {
   };
 
   return (
-    <ScreenContainer className="flex-1 px-4 pt-4" containerClassName="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-400">
+    <ScreenContainer className="flex-1 px-4 pt-4">
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* 用户信息 */}
           <View className="mb-6">

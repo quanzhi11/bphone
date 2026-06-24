@@ -1,5 +1,5 @@
 /**
- * 联机邀请弹窗 — 手机版仅作通知，不加入房间。
+ * 联机邀请弹窗 — PC 端液态玻璃对话框风格
  */
 
 import React, { useCallback } from "react";
@@ -11,6 +11,8 @@ import {
   Alert,
 } from "react-native";
 import { friendsApi, type RoomInvite } from "@/lib/_core/booxin-api";
+import { GlassCard } from "@/components/glassmorphism";
+import { glassColors } from "@/lib/glass-theme";
 import * as Haptics from "expo-haptics";
 
 export interface NotificationModalProps {
@@ -67,41 +69,48 @@ export function NotificationModal({
       <View
         style={{
           flex: 1,
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          backgroundColor: "rgba(0, 0, 0, 0.55)",
           justifyContent: "center",
           alignItems: "center",
           padding: 16,
         }}
       >
-        <View
-          className="w-full bg-white rounded-2xl p-6 shadow-lg"
+        <GlassCard
+          variant="dialog"
+          className="w-full p-6"
           style={{ maxWidth: 320 }}
         >
-          <Text className="text-xl font-bold text-gray-900 mb-2">
+          <Text
+            className="text-xl font-bold mb-2"
+            style={{ color: glassColors.text }}
+          >
             联机邀请
           </Text>
 
           <View className="mb-4">
-            <Text className="text-base text-gray-700 mb-3">
-              <Text className="font-semibold">{invite.senderUsername}</Text>
+            <Text className="text-base mb-3" style={{ color: glassColors.text }}>
+              <Text style={{ fontWeight: "600" }}>{invite.senderUsername}</Text>
               {" "}邀请你加入房间
             </Text>
 
-            <View className="bg-gray-100 rounded-lg p-3 mb-3">
-              <Text className="text-sm font-semibold text-gray-900 mb-1">
+            <GlassCard variant="nav" showDispersion={false} className="p-3 mb-3">
+              <Text
+                className="text-sm font-semibold mb-1"
+                style={{ color: glassColors.text }}
+              >
                 房间码: {invite.roomCode}
               </Text>
               {invite.modpackGameVersion ? (
-                <Text className="text-xs text-gray-600">
+                <Text className="text-xs" style={{ color: glassColors.textSecondary }}>
                   {invite.modpackGameVersion} • {invite.modpackLoader}
                 </Text>
               ) : null}
-            </View>
+            </GlassCard>
 
-            <Text className="text-xs text-gray-500 mb-2">
+            <Text className="text-xs mb-2" style={{ color: glassColors.textSecondary }}>
               {new Date(invite.createdAtUtc).toLocaleString()}
             </Text>
-            <Text className="text-xs text-blue-600">
+            <Text className="text-xs" style={{ color: "#55B8E8" }}>
               请在 PC 版 Booxin 启动器输入房间码加入，手机版不提供进房功能。
             </Text>
           </View>
@@ -109,9 +118,14 @@ export function NotificationModal({
           {onViewInvites ? (
             <TouchableOpacity
               onPress={onViewInvites}
-              className="bg-gray-100 rounded-lg py-2.5 items-center mb-3"
+              className="rounded-lg py-2.5 items-center mb-3"
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.094)",
+                borderWidth: 1,
+                borderColor: glassColors.borderSubtle,
+              }}
             >
-              <Text className="text-gray-700 font-semibold text-sm">
+              <Text style={{ color: glassColors.text, fontWeight: "600" }}>
                 查看全部邀请
               </Text>
             </TouchableOpacity>
@@ -120,18 +134,32 @@ export function NotificationModal({
           <View className="flex-row gap-2">
             <TouchableOpacity
               onPress={handleDismissInvite}
-              className="flex-1 bg-gray-200 rounded-lg py-3 items-center"
+              className="flex-1 rounded-lg py-3 items-center"
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.094)",
+                borderWidth: 1,
+                borderColor: glassColors.borderSubtle,
+              }}
             >
-              <Text className="text-gray-700 font-semibold">忽略</Text>
+              <Text style={{ color: glassColors.text, fontWeight: "600" }}>
+                忽略
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleAcknowledge}
-              className="flex-1 bg-blue-500 rounded-lg py-3 items-center"
+              className="flex-1 rounded-lg py-3 items-center"
+              style={{
+                backgroundColor: glassColors.primary,
+                borderWidth: 1,
+                borderColor: glassColors.border,
+              }}
             >
-              <Text className="text-white font-semibold">知道了</Text>
+              <Text style={{ color: glassColors.text, fontWeight: "600" }}>
+                知道了
+              </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </GlassCard>
       </View>
     </Modal>
   );

@@ -17,6 +17,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassCard } from "@/components/glassmorphism";
 import { authApi, friendsApi, type User } from "@/lib/_core/booxin-api";
+import { glassInputStyle } from "@/lib/glass-theme";
 
 export default function LobbyScreen() {
   const [users, setUsers] = useState<User[]>([]);
@@ -125,10 +126,7 @@ export default function LobbyScreen() {
   };
 
   return (
-    <ScreenContainer
-      className="flex-1 px-4 pt-4"
-      containerClassName="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-400"
-    >
+    <ScreenContainer className="flex-1 px-4 pt-4">
       <View className="mb-6">
         <Text className="text-white text-3xl font-bold">用户大厅</Text>
         <Text className="text-white/60 text-sm">浏览全站用户并发送好友申请</Text>
@@ -136,15 +134,11 @@ export default function LobbyScreen() {
 
       <TextInput
         placeholder="搜索用户..."
-        placeholderTextColor="rgba(255, 255, 255, 0.4)"
+        placeholderTextColor="rgba(160, 174, 200, 0.8)"
         value={search}
         onChangeText={setSearch}
-        className="bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white mb-6"
-        style={{
-          color: "white",
-          borderColor: "rgba(255, 255, 255, 0.2)",
-          backgroundColor: "rgba(255, 255, 255, 0.1)",
-        }}
+        className="mb-6"
+        style={glassInputStyle}
       />
 
       {loading && !refreshing ? (

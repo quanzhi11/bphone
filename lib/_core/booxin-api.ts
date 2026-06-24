@@ -197,14 +197,21 @@ export const tokenManager = {
     }
   },
 
+  async getTokenExpiry(): Promise<string | null> {
+    try {
+      if (Platform.OS === "web") {
+        return await AsyncStorage.getItem(TOKEN_EXPIRY_KEY);
+      }
+      return await SecureStore.getItemAsync(TOKEN_EXPIRY_KEY);
+    } catch (error) {
+      console.error("Failed to get token expiry:", error);
+      return null;
+    }
+  },
+
   async isTokenExpired(): Promise<boolean> {
     try {
-      let expiryStr: string | null = null;
-      if (Platform.OS === "web") {
-        expiryStr = await AsyncStorage.getItem(TOKEN_EXPIRY_KEY);
-      } else {
-        expiryStr = await SecureStore.getItemAsync(TOKEN_EXPIRY_KEY);
-      }
+      const expiryStr = await tokenManager.getTokenExpiry();
       if (!expiryStr) return true;
       return new Date(expiryStr) <= new Date();
     } catch (error) {
