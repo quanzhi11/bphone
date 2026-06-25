@@ -1,5 +1,6 @@
 /**
- * 账户屏幕 - 包含用户信息、修改密码、登出
+ * 账户屏幕 - 用户信息、修改密码、登出
+ * 卡片式设计
  */
 
 import React, { useState } from "react";
@@ -17,6 +18,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { GlassCard } from "@/components/glassmorphism";
 import { useAuth } from "@/lib/auth-context";
 import { authApi } from "@/lib/_core/booxin-api";
+import { glassColors, glassInputStyle } from "@/lib/glass-theme";
 import * as Haptics from "expo-haptics";
 
 export default function AccountScreen() {
@@ -82,133 +84,135 @@ export default function AccountScreen() {
 
   return (
     <ScreenContainer className="flex-1 px-4 pt-4">
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {/* 用户信息 */}
-          <View className="mb-6">
-            <Text className="text-white text-3xl font-bold">账户</Text>
-            {state.user ? (
-              <Text className="text-white/60 text-sm mt-2">
-                {state.user.username} · 联机通知伴侣
-              </Text>
-            ) : null}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* 页面标题 */}
+        <View style={{ marginBottom: 20 }}>
+          <Text style={{ color: glassColors.text, fontSize: 26, fontWeight: "800" }}>账户</Text>
+          {state.user ? (
+            <Text style={{ color: glassColors.textSecondary, fontSize: 13, marginTop: 4 }}>
+              {state.user.username} · 联机通知伴侣
+            </Text>
+          ) : null}
+        </View>
+
+        {/* 用户信息卡片 */}
+        <GlassCard className="mb-4 p-4">
+          <View style={{ marginBottom: 12 }}>
+            <Text style={{ color: glassColors.textSecondary, fontSize: 11, marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              用户 ID
+            </Text>
+            <Text style={{ color: glassColors.text, fontFamily: "monospace", fontSize: 13 }}>
+              {state.user?.id || "未知"}
+            </Text>
+          </View>
+          <View>
+            <Text style={{ color: glassColors.textSecondary, fontSize: 11, marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              创建时间
+            </Text>
+            <Text style={{ color: glassColors.text, fontSize: 13 }}>
+              {state.user?.createdAtUtc
+                ? new Date(state.user.createdAtUtc).toLocaleDateString()
+                : "未知"}
+            </Text>
+          </View>
+        </GlassCard>
+
+        {/* 修改密码卡片 */}
+        <GlassCard className="mb-4 p-4">
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: isChangingPassword ? 16 : 0 }}>
+            <Text style={{ color: glassColors.text, fontWeight: "700", fontSize: 17 }}>
+              修改密码
+            </Text>
+            {!isChangingPassword && (
+              <TouchableOpacity
+                onPress={() => setIsChangingPassword(true)}
+                style={{ backgroundColor: "rgba(85, 184, 232, 0.15)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 }}
+              >
+                <Text style={{ color: glassColors.primary, fontSize: 13, fontWeight: "600" }}>修改</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* 用户详情卡片 */}
-          <GlassCard className="mb-6 p-4">
-            <View className="mb-4">
-              <Text className="text-white/60 text-xs mb-1">用户 ID</Text>
-              <Text className="text-white font-mono text-sm">
-                {state.user?.id || "未知"}
-              </Text>
-            </View>
-            <View>
-              <Text className="text-white/60 text-xs mb-1">账户创建时间</Text>
-              <Text className="text-white text-sm">
-                {state.user?.createdAtUtc
-                  ? new Date(state.user.createdAtUtc).toLocaleDateString()
-                  : "未知"}
-              </Text>
-            </View>
-          </GlassCard>
+          {isChangingPassword && (
+            <>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginBottom: 4 }}>当前密码</Text>
+                <TextInput
+                  style={glassInputStyle}
+                  placeholder="输入当前密码"
+                  placeholderTextColor={glassColors.textSecondary}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  editable={!isLoading}
+                  secureTextEntry
+                />
+              </View>
 
-          {/* 修改密码 */}
-          <GlassCard className="mb-6 p-4">
-            <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-white font-bold text-lg">修改密码</Text>
-              {!isChangingPassword && (
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginBottom: 4 }}>新密码</Text>
+                <TextInput
+                  style={glassInputStyle}
+                  placeholder="输入新密码"
+                  placeholderTextColor={glassColors.textSecondary}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  editable={!isLoading}
+                  secureTextEntry
+                />
+              </View>
+
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginBottom: 4 }}>确认新密码</Text>
+                <TextInput
+                  style={glassInputStyle}
+                  placeholder="再次输入新密码"
+                  placeholderTextColor={glassColors.textSecondary}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  editable={!isLoading}
+                  secureTextEntry
+                />
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 8 }}>
                 <TouchableOpacity
-                  onPress={() => setIsChangingPassword(true)}
-                  className="bg-blue-500/50 rounded-lg px-3 py-1"
+                  onPress={() => {
+                    setIsChangingPassword(false);
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                  }}
+                  disabled={isLoading}
+                  style={{ flex: 1, backgroundColor: "rgba(255, 255, 255, 0.06)", borderRadius: 8, paddingVertical: 10, alignItems: "center" }}
                 >
-                  <Text className="text-white text-sm font-semibold">修改</Text>
+                  <Text style={{ color: glassColors.textSecondary, fontWeight: "600" }}>取消</Text>
                 </TouchableOpacity>
-              )}
-            </View>
+                <TouchableOpacity
+                  onPress={handleChangePassword}
+                  disabled={isLoading}
+                  style={{ flex: 1, backgroundColor: "rgba(85, 184, 232, 0.15)", borderRadius: 8, paddingVertical: 10, alignItems: "center" }}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color={glassColors.primary} />
+                  ) : (
+                    <Text style={{ color: glassColors.primary, fontWeight: "600" }}>保存</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </GlassCard>
 
-            {isChangingPassword && (
-              <>
-                {/* 当前密码 */}
-                <View className="mb-3">
-                  <Text className="text-white/60 text-xs mb-1">当前密码</Text>
-                  <TextInput
-                    className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white"
-                    placeholder="输入当前密码"
-                    placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                    value={currentPassword}
-                    onChangeText={setCurrentPassword}
-                    editable={!isLoading}
-                    secureTextEntry
-                  />
-                </View>
+        {/* 退出登录 */}
+        <TouchableOpacity
+          onPress={handleLogout}
+          style={{ backgroundColor: "rgba(248, 113, 113, 0.12)", borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 8 }}
+        >
+          <Text style={{ color: glassColors.danger, fontWeight: "700", fontSize: 15 }}>退出登录</Text>
+        </TouchableOpacity>
 
-                {/* 新密码 */}
-                <View className="mb-3">
-                  <Text className="text-white/60 text-xs mb-1">新密码</Text>
-                  <TextInput
-                    className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white"
-                    placeholder="输入新密码"
-                    placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                    editable={!isLoading}
-                    secureTextEntry
-                  />
-                </View>
-
-                {/* 确认新密码 */}
-                <View className="mb-4">
-                  <Text className="text-white/60 text-xs mb-1">确认新密码</Text>
-                  <TextInput
-                    className="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white"
-                    placeholder="再次输入新密码"
-                    placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    editable={!isLoading}
-                    secureTextEntry
-                  />
-                </View>
-
-                {/* 按钮 */}
-                <View className="flex-row gap-2">
-                  <TouchableOpacity
-                    onPress={() => {
-                      setIsChangingPassword(false);
-                      setCurrentPassword("");
-                      setNewPassword("");
-                      setConfirmPassword("");
-                    }}
-                    disabled={isLoading}
-                    className="flex-1 bg-gray-500/30 rounded-lg py-2 items-center"
-                  >
-                    <Text className="text-gray-300 font-semibold">取消</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleChangePassword}
-                    disabled={isLoading}
-                    className="flex-1 bg-blue-500/50 rounded-lg py-2 items-center"
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator size="small" color="white" />
-                    ) : (
-                      <Text className="text-white font-semibold">保存</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </GlassCard>
-
-          {/* 退出登录按钮 */}
-          <TouchableOpacity
-            onPress={handleLogout}
-            className="bg-red-500/50 rounded-lg py-3 items-center mt-6"
-          >
-            <Text className="text-white font-bold text-base">退出登录</Text>
-          </TouchableOpacity>
-
-          <View className="h-8" />
-        </ScrollView>
-      </ScreenContainer>
+        <View style={{ height: 32 }} />
+      </ScrollView>
+    </ScreenContainer>
   );
 }

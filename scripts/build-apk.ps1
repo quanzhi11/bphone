@@ -18,7 +18,7 @@ New-Item -ItemType Directory -Force -Path $assetsDir | Out-Null
 Add-Type -AssemblyName System.Drawing
 $size = 1024
 $padding = 72
-$bg = [System.Drawing.Color]::FromArgb(255, 11, 16, 32)
+$bg = [System.Drawing.Color]::FromArgb(255, 15, 25, 35)
 function Save-SquareIcon([string]$dest) {
   $bmp = New-Object System.Drawing.Bitmap $size, $size
   $g = [System.Drawing.Graphics]::FromImage($bmp)

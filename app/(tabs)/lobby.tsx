@@ -1,5 +1,6 @@
 /**
  * 用户大厅 — 浏览全站用户、发送好友申请
+ * 卡片式设计
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -17,7 +18,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassCard } from "@/components/glassmorphism";
 import { authApi, friendsApi, type User } from "@/lib/_core/booxin-api";
-import { glassInputStyle } from "@/lib/glass-theme";
+import { glassColors, glassInputStyle } from "@/lib/glass-theme";
 
 export default function LobbyScreen() {
   const [users, setUsers] = useState<User[]>([]);
@@ -89,61 +90,64 @@ export default function LobbyScreen() {
 
     return (
       <GlassCard className="mb-3 p-4">
-        <View className="flex-row justify-between items-center mb-3">
-          <View className="flex-1">
-            <Text className="text-white font-semibold">{item.username}</Text>
-            <Text className="text-white/60 text-xs">
-              {item.isOnline ? "🟢 在线" : "⚫ 离线"}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: glassColors.text, fontWeight: "600", fontSize: 15 }}>
+              {item.username}
+            </Text>
+            <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginTop: 2 }}>
+              {item.isOnline ? "在线" : "离线"}
               {item.isInRoom ? " · 在房间" : ""}
             </Text>
           </View>
-        </View>
 
-        {item.isFriend ? (
-          <View className="bg-green-500/20 rounded-lg px-3 py-2">
-            <Text className="text-green-300 text-xs font-semibold text-center">
-              已是好友
-            </Text>
-          </View>
-        ) : requestSent ? (
-          <View className="bg-yellow-500/20 rounded-lg px-3 py-2">
-            <Text className="text-yellow-200 text-xs font-semibold text-center">
-              申请已发送
-            </Text>
-          </View>
-        ) : (
-          <TouchableOpacity
-            onPress={() => handleAddFriend(item.id, item.username)}
-            className="bg-blue-500/50 rounded-lg px-3 py-2"
-          >
-            <Text className="text-white font-semibold text-sm text-center">
-              加好友
-            </Text>
-          </TouchableOpacity>
-        )}
+          {item.isFriend ? (
+            <View style={{ backgroundColor: "rgba(52, 211, 153, 0.12)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ color: glassColors.success, fontSize: 12, fontWeight: "600" }}>
+                已是好友
+              </Text>
+            </View>
+          ) : requestSent ? (
+            <View style={{ backgroundColor: "rgba(251, 191, 36, 0.12)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ color: glassColors.warning, fontSize: 12, fontWeight: "600" }}>
+                申请已发送
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => handleAddFriend(item.id, item.username)}
+              style={{ backgroundColor: "rgba(85, 184, 232, 0.15)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
+            >
+              <Text style={{ color: glassColors.primary, fontWeight: "600", fontSize: 13 }}>
+                加好友
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </GlassCard>
     );
   };
 
   return (
     <ScreenContainer className="flex-1 px-4 pt-4">
-      <View className="mb-6">
-        <Text className="text-white text-3xl font-bold">用户大厅</Text>
-        <Text className="text-white/60 text-sm">浏览全站用户并发送好友申请</Text>
+      <View style={{ marginBottom: 20 }}>
+        <Text style={{ color: glassColors.text, fontSize: 26, fontWeight: "800" }}>用户大厅</Text>
+        <Text style={{ color: glassColors.textSecondary, fontSize: 13, marginTop: 4 }}>
+          浏览全站用户并发送好友申请
+        </Text>
       </View>
 
       <TextInput
         placeholder="搜索用户..."
-        placeholderTextColor="rgba(160, 174, 200, 0.8)"
+        placeholderTextColor={glassColors.textSecondary}
         value={search}
         onChangeText={setSearch}
-        className="mb-6"
-        style={glassInputStyle}
+        style={[glassInputStyle, { marginBottom: 16 }]}
       />
 
       {loading && !refreshing ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="white" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={glassColors.primary} />
         </View>
       ) : (
         <FlatList
@@ -154,12 +158,12 @@ export default function LobbyScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="white"
+              tintColor={glassColors.primary}
             />
           }
           ListEmptyComponent={
-            <View className="items-center justify-center py-12">
-              <Text className="text-white/60">暂无用户</Text>
+            <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 48 }}>
+              <Text style={{ color: glassColors.textSecondary }}>暂无用户</Text>
             </View>
           }
         />

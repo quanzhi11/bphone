@@ -1,6 +1,6 @@
 /**
  * 首页 - 公共房间列表
- * 采用液态玻璃设计
+ * 卡片式设计 + 纯色背景
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -18,6 +18,7 @@ import { GlassCard } from "@/components/glassmorphism";
 import { useColors } from "@/hooks/use-colors";
 import { useAuth } from "@/lib/auth-context";
 import { roomsApi, type Room } from "@/lib/_core/booxin-api";
+import { glassColors } from "@/lib/glass-theme";
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -46,62 +47,78 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchRooms();
-    const interval = setInterval(fetchRooms, 30000); // 每 30 秒刷新
+    const interval = setInterval(fetchRooms, 30000);
     return () => clearInterval(interval);
   }, [fetchRooms]);
 
   const renderRoomCard = ({ item }: { item: Room }) => (
-    <GlassCard className="mb-4 p-4">
-      <View className="flex-row justify-between items-start mb-3">
-        <View className="flex-1">
-          <Text className="text-white font-bold text-lg">{item.roomCode}</Text>
-          <Text className="text-white/70 text-sm">房主: {item.hostName}</Text>
-        </View>
-        <View className="bg-blue-500/40 rounded-full px-3 py-1">
-          <Text className="text-white text-xs font-semibold">
+    <GlassCard className="mb-3 p-4">
+      {/* 房间码 + 人数 */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <Text style={{ color: glassColors.text, fontWeight: "700", fontSize: 17 }}>
+          {item.roomCode}
+        </Text>
+        <View style={{ backgroundColor: "rgba(85, 184, 232, 0.15)", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 }}>
+          <Text style={{ color: glassColors.primary, fontSize: 12, fontWeight: "600" }}>
             {item.currentPlayers}/{item.maxPlayers}
           </Text>
         </View>
       </View>
 
-      <Text className="text-white/90 text-sm mb-2">{item.motd}</Text>
-      {item.remark && (
-        <Text className="text-white/60 text-xs italic mb-3">{item.remark}</Text>
-      )}
+      {/* 房主 */}
+      <Text style={{ color: glassColors.textSecondary, fontSize: 13, marginBottom: 4 }}>
+        房主: {item.hostName}
+      </Text>
 
-      <View className="flex-row justify-between items-center">
-        <View>
-          <Text className="text-white/70 text-xs">版本: {item.version}</Text>
-          {item.modpackUrl && (
-            <Text className="text-blue-300 text-xs">有整合包</Text>
-          )}
-        </View>
-        <View className="bg-white/15 rounded-lg px-3 py-2">
-          <Text className="text-white/80 font-medium text-xs">PC 启动器加入</Text>
+      {/* Motd */}
+      {item.motd ? (
+        <Text style={{ color: glassColors.text, fontSize: 14, marginBottom: 4 }} numberOfLines={2}>
+          {item.motd}
+        </Text>
+      ) : null}
+
+      {/* 备注 */}
+      {item.remark ? (
+        <Text style={{ color: glassColors.textSecondary, fontSize: 12, fontStyle: "italic", marginBottom: 8 }} numberOfLines={1}>
+          {item.remark}
+        </Text>
+      ) : null}
+
+      {/* 底部信息栏 */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+        <Text style={{ color: glassColors.textSecondary, fontSize: 12 }}>
+          版本: {item.version}
+        </Text>
+        <View style={{ backgroundColor: "rgba(255, 255, 255, 0.06)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+          <Text style={{ color: glassColors.textSecondary, fontSize: 12 }}>
+            PC 启动器加入
+          </Text>
         </View>
       </View>
     </GlassCard>
   );
 
   const renderEmptyState = () => (
-    <View className="flex-1 items-center justify-center py-12">
-      <Text className="text-white/60 text-lg mb-2">暂无房间</Text>
-      <Text className="text-white/40 text-sm">下拉刷新或稍后重试</Text>
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 48 }}>
+      <Text style={{ color: glassColors.textSecondary, fontSize: 16, marginBottom: 6 }}>暂无房间</Text>
+      <Text style={{ color: glassColors.textSecondary, fontSize: 13, opacity: 0.7 }}>下拉刷新或稍后重试</Text>
     </View>
   );
 
   return (
     <ScreenContainer className="flex-1 px-4 pt-4">
-      {/* 标题 */}
-      <View className="mb-6">
-        <Text className="text-white text-3xl font-bold">公共房间</Text>
-        <Text className="text-white/60 text-sm">只读浏览，请在 PC 启动器加入房间</Text>
+      {/* 页面标题 */}
+      <View style={{ marginBottom: 20 }}>
+        <Text style={{ color: glassColors.text, fontSize: 26, fontWeight: "800" }}>公共房间</Text>
+        <Text style={{ color: glassColors.textSecondary, fontSize: 13, marginTop: 4 }}>
+          只读浏览，请在 PC 启动器加入房间
+        </Text>
       </View>
 
       {/* 房间列表 */}
       {loading && !refreshing ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="white" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={glassColors.primary} />
         </View>
       ) : (
         <FlatList
@@ -113,7 +130,7 @@ export default function HomeScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="white"
+              tintColor={glassColors.primary}
             />
           }
           scrollEnabled={true}

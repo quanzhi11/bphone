@@ -1,5 +1,6 @@
 /**
  * 好友列表 — 好友、申请、联机邀请
+ * 卡片式设计
  */
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -26,6 +27,12 @@ import {
 } from "@/lib/_core/booxin-api";
 import { glassColors } from "@/lib/glass-theme";
 import * as Haptics from "expo-haptics";
+
+const TAB_CONFIG = [
+  { key: "friends" as const, label: "好友" },
+  { key: "requests" as const, label: "申请" },
+  { key: "invites" as const, label: "邀请" },
+] as const;
 
 export default function FriendsScreen() {
   const { state } = useAuth();
@@ -100,11 +107,13 @@ export default function FriendsScreen() {
 
   const renderFriend = ({ item }: { item: Friend }) => (
     <GlassCard className="mb-3 p-4">
-      <View className="flex-row justify-between items-center">
-        <View className="flex-1">
-          <Text className="text-white font-semibold">{item.username}</Text>
-          <Text className="text-white/60 text-xs">
-            {item.isOnline ? "🟢 在线" : "⚫ 离线"}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: glassColors.text, fontWeight: "600", fontSize: 15 }}>
+            {item.username}
+          </Text>
+          <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginTop: 2 }}>
+            {item.isOnline ? "在线" : "离线"}
             {item.isInRoom ? " · 在房间" : ""}
           </Text>
         </View>
@@ -114,22 +123,26 @@ export default function FriendsScreen() {
 
   const renderRequest = ({ item }: { item: FriendRequest }) => (
     <GlassCard className="mb-3 p-4">
-      <View className="mb-3">
-        <Text className="text-white font-semibold">{item.username}</Text>
-        <Text className="text-white/60 text-xs">请求添加您为好友</Text>
+      <View style={{ marginBottom: 12 }}>
+        <Text style={{ color: glassColors.text, fontWeight: "600", fontSize: 15 }}>
+          {item.username}
+        </Text>
+        <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginTop: 2 }}>
+          请求添加您为好友
+        </Text>
       </View>
-      <View className="flex-row gap-2">
+      <View style={{ flexDirection: "row", gap: 8 }}>
         <TouchableOpacity
           onPress={() => handleRejectRequest(item.requestId)}
-          className="flex-1 bg-red-500/30 rounded-lg py-2 items-center"
+          style={{ flex: 1, backgroundColor: "rgba(248, 113, 113, 0.12)", borderRadius: 8, paddingVertical: 8, alignItems: "center" }}
         >
-          <Text className="text-red-300 font-semibold text-sm">拒绝</Text>
+          <Text style={{ color: glassColors.danger, fontWeight: "600", fontSize: 13 }}>拒绝</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => handleAcceptRequest(item.requestId)}
-          className="flex-1 bg-green-500/30 rounded-lg py-2 items-center"
+          style={{ flex: 1, backgroundColor: "rgba(52, 211, 153, 0.12)", borderRadius: 8, paddingVertical: 8, alignItems: "center" }}
         >
-          <Text className="text-green-300 font-semibold text-sm">同意</Text>
+          <Text style={{ color: glassColors.success, fontWeight: "600", fontSize: 13 }}>同意</Text>
         </TouchableOpacity>
       </View>
     </GlassCard>
@@ -137,26 +150,30 @@ export default function FriendsScreen() {
 
   const renderInvite = ({ item }: { item: RoomInvite }) => (
     <GlassCard className="mb-3 p-4">
-      <View className="mb-3">
-        <Text className="text-white font-semibold">{item.senderUsername}</Text>
-        <Text className="text-white/60 text-xs mb-2">邀请您加入房间</Text>
-        <Text className="text-white text-sm">
-          房间码: <Text className="font-mono">{item.roomCode}</Text>
+      <View style={{ marginBottom: 12 }}>
+        <Text style={{ color: glassColors.text, fontWeight: "600", fontSize: 15 }}>
+          {item.senderUsername}
+        </Text>
+        <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginTop: 2, marginBottom: 6 }}>
+          邀请您加入房间
+        </Text>
+        <Text style={{ color: glassColors.text, fontSize: 14 }}>
+          房间码: <Text style={{ fontFamily: "monospace" }}>{item.roomCode}</Text>
         </Text>
         {item.modpackGameVersion ? (
-          <Text className="text-white/60 text-xs mt-1">
-            {item.modpackGameVersion} • {item.modpackLoader}
+          <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginTop: 4 }}>
+            {item.modpackGameVersion} · {item.modpackLoader}
           </Text>
         ) : null}
-        <Text className="text-blue-200 text-xs mt-2">
+        <Text style={{ color: glassColors.primary, fontSize: 12, marginTop: 6 }}>
           请在 PC 启动器输入房间码加入
         </Text>
       </View>
       <TouchableOpacity
         onPress={() => handleDismissInvite(item.inviteId)}
-        className="bg-gray-500/30 rounded-lg py-2 items-center"
+        style={{ backgroundColor: "rgba(255, 255, 255, 0.06)", borderRadius: 8, paddingVertical: 8, alignItems: "center" }}
       >
-        <Text className="text-gray-300 font-semibold text-sm">忽略</Text>
+        <Text style={{ color: glassColors.textSecondary, fontWeight: "600", fontSize: 13 }}>忽略</Text>
       </TouchableOpacity>
     </GlassCard>
   );
@@ -165,40 +182,55 @@ export default function FriendsScreen() {
   const requests = data?.incomingRequests ?? [];
   const invites = data?.pendingRoomInvites ?? [];
 
+  const tabCounts = {
+    friends: friends.length,
+    requests: requests.length,
+    invites: invites.length,
+  };
+
   return (
     <ScreenContainer className="flex-1 px-4 pt-4">
-      <View className="flex-row gap-2 mb-6">
-        {(["friends", "requests", "invites"] as const).map((t) => (
-          <TouchableOpacity key={t} onPress={() => setTab(t)} className="flex-1">
-            <GlassCard
-              variant="nav"
-              showDispersion={false}
-              className="py-2"
+      {/* 页面标题 */}
+      <View style={{ marginBottom: 16 }}>
+        <Text style={{ color: glassColors.text, fontSize: 26, fontWeight: "800" }}>好友</Text>
+      </View>
+
+      {/* Tab 切换 */}
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+        {TAB_CONFIG.map((t) => {
+          const isActive = tab === t.key;
+          return (
+            <TouchableOpacity
+              key={t.key}
+              onPress={() => setTab(t.key)}
               style={{
-                opacity: tab === t ? 1 : 0.72,
-                borderColor: tab === t ? glassColors.border : glassColors.borderSubtle,
+                flex: 1,
+                backgroundColor: isActive ? "rgba(85, 184, 232, 0.15)" : glassColors.cardBg,
+                borderRadius: 10,
+                paddingVertical: 8,
+                alignItems: "center",
+                borderWidth: 1,
+                borderColor: isActive ? "rgba(85, 184, 232, 0.3)" : glassColors.cardBorder,
               }}
             >
               <Text
-                className="text-center font-semibold text-sm"
                 style={{
-                  color: tab === t ? glassColors.text : glassColors.textSecondary,
+                  color: isActive ? glassColors.primary : glassColors.textSecondary,
+                  fontWeight: "600",
+                  fontSize: 13,
                 }}
               >
-              {t === "friends"
-                ? `好友 (${friends.length})`
-                : t === "requests"
-                  ? `申请 (${requests.length})`
-                  : `邀请 (${invites.length})`}
-            </Text>
-            </GlassCard>
-          </TouchableOpacity>
-        ))}
+                {t.label} ({tabCounts[t.key]})
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
+      {/* 列表 */}
       {loading && !refreshing ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="white" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={glassColors.primary} />
         </View>
       ) : tab === "friends" ? (
         <FlatList
@@ -206,15 +238,11 @@ export default function FriendsScreen() {
           renderItem={renderFriend}
           keyExtractor={(item) => item.userId}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="white"
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={glassColors.primary} />
           }
           ListEmptyComponent={
-            <View className="items-center justify-center py-12">
-              <Text className="text-white/60">暂无好友</Text>
+            <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 48 }}>
+              <Text style={{ color: glassColors.textSecondary }}>暂无好友</Text>
             </View>
           }
         />
@@ -224,15 +252,11 @@ export default function FriendsScreen() {
           renderItem={renderRequest}
           keyExtractor={(item) => item.requestId}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="white"
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={glassColors.primary} />
           }
           ListEmptyComponent={
-            <View className="items-center justify-center py-12">
-              <Text className="text-white/60">暂无好友申请</Text>
+            <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 48 }}>
+              <Text style={{ color: glassColors.textSecondary }}>暂无好友申请</Text>
             </View>
           }
         />
@@ -242,15 +266,11 @@ export default function FriendsScreen() {
           renderItem={renderInvite}
           keyExtractor={(item) => item.inviteId}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="white"
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={glassColors.primary} />
           }
           ListEmptyComponent={
-            <View className="items-center justify-center py-12">
-              <Text className="text-white/60">暂无邀请</Text>
+            <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 48 }}>
+              <Text style={{ color: glassColors.textSecondary }}>暂无邀请</Text>
             </View>
           }
         />
