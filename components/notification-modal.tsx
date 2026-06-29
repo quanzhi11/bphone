@@ -14,6 +14,7 @@ import { friendsApi, type RoomInvite } from "@/lib/_core/booxin-api";
 import { GlassCard } from "@/components/glassmorphism";
 import { glassColors } from "@/lib/glass-theme";
 import * as Haptics from "expo-haptics";
+import * as Clipboard from "expo-clipboard";
 
 export interface NotificationModalProps {
   visible: boolean;
@@ -54,6 +55,14 @@ export function NotificationModal({
       Alert.alert("错误", "忽略邀请失败");
     }
   }, [invite, onDismiss]);
+
+  const handleCopyRoomCode = useCallback(async () => {
+    if (!invite) {
+      return;
+    }
+    await Clipboard.setStringAsync(invite.roomCode);
+    Alert.alert("已复制", `房间码 ${invite.roomCode} 已复制`);
+  }, [invite]);
 
   if (!invite) {
     return null;
@@ -130,6 +139,14 @@ export function NotificationModal({
               </Text>
             </TouchableOpacity>
           ) : null}
+
+          <TouchableOpacity
+            onPress={handleCopyRoomCode}
+            className="rounded-lg py-2.5 items-center mb-3"
+            style={{ backgroundColor: "rgba(85, 184, 232, 0.15)" }}
+          >
+            <Text style={{ color: glassColors.primary, fontWeight: "600" }}>复制房间码</Text>
+          </TouchableOpacity>
 
           <View className="flex-row gap-2">
             <TouchableOpacity

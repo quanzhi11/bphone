@@ -1,11 +1,17 @@
 /**
  * 认证上下文
- * 
- * 管理用户认证状态、Token、用户信息
  */
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from "react";
-import { authApi, tokenManager, User, AuthToken } from "@/lib/_core/booxin-api";
+import {
+  authApi,
+  tokenManager,
+  User,
+  AuthToken,
+  getAuthApiRoot,
+  setUnauthorizedHandler,
+  formatApiError,
+} from "@/lib/_core/booxin-api";
 import { resetInviteNotificationState } from "@/lib/invite-notification-poller";
 
 export interface AuthState {
@@ -14,6 +20,7 @@ export interface AuthState {
   userToken: string | null;
   user: User | null;
   error: string | null;
+  authApiRoot: string;
 }
 
 export type AuthAction =
@@ -23,7 +30,8 @@ export type AuthAction =
   | { type: "SIGN_UP"; payload: AuthToken }
   | { type: "SET_ERROR"; payload: string }
   | { type: "CLEAR_ERROR" }
-  | { type: "SET_LOADING"; payload: boolean };
+  | { type: "SET_LOADING"; payload: boolean }
+  | { type: "UPDATE_USER"; payload: User };
 
 const initialState: AuthState = {
   isLoading: true,
@@ -31,6 +39,7 @@ const initialState: AuthState = {
   userToken: null,
   user: null,
   error: null,
+  authApiRoot: getAuthApiRoot(),
 };
 
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
@@ -41,6 +50,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
         userToken: action.payload,
         isSignout: false,
+        authApiRoot: getAuthApiRoot(),
       };
     case "SIGN_IN":
     case "SIGN_UP":
@@ -51,6 +61,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         user: action.payload.user,
         isSignout: false,
         error: null,
+        authApiRoot: getAuthApiRoot(),
       };
     case "SIGN_OUT":
       return {
@@ -60,6 +71,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         user: null,
         isSignout: true,
         error: null,
+        authApiRoot: getAuthApiRoot(),
       };
     case "SET_ERROR":
       return {
@@ -76,6 +88,12 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         ...state,
         isLoading: action.payload,
       };
+    case "UPDATE_USER":
+      return {
+        ...state,
+        user: action.payload,
+        authApiRoot: getAuthApiRoot(),
+      };
     default:
       return state;
   }
@@ -84,9 +102,13 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 export interface AuthContextType {
   state: AuthState;
   signIn: (username: string, password: string) => Promise<void>;
-  signUp: (username: string, password: string) => Promise<void>;
+  signInWithEmail: (email: string, code: string) => Promise<void>;
+  signUp: (username: string, password: string, email: string, emailCode: string) => Promise<void>;
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
+  refreshUser: () => Promise<void>;
+  updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -94,7 +116,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // 初始化：尝试恢复 Token 并拉取用户信息（与 PC 端联机认证一致）
+  const signOutInternal = useCallback(async () => {
+    await tokenManager.clearToken();
+    await resetInviteNotificationState();
+    dispatch({ type: "SIGN_OUT" });
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      void signOutInternal();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [signOutInternal]);
+
   useEffect(() => {
     const bootstrapAsync = async () => {
       try {
@@ -111,10 +145,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const expiresAtUtc =
-          (await tokenManager.getTokenExpiry()) ?? new Date().toISOString();
+        const expiresAtUtc = (await tokenManager.getTokenExpiry()) ?? new Date().toISOString();
 
         try {
+          const validation = await authApi.validate(token);
+          if (!validation?.isValid) {
+            await tokenManager.clearToken();
+            dispatch({ type: "SIGN_OUT" });
+            return;
+          }
+
           const user = await authApi.getCurrentUser();
           dispatch({
             type: "SIGN_IN",
@@ -126,8 +166,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             },
           });
         } catch {
-          await tokenManager.clearToken();
-          dispatch({ type: "SIGN_OUT" });
+          try {
+            const user = await authApi.getCurrentUser();
+            dispatch({
+              type: "SIGN_IN",
+              payload: {
+                accessToken: token,
+                tokenType: "Bearer",
+                expiresAtUtc,
+                user,
+              },
+            });
+          } catch {
+            await tokenManager.clearToken();
+            dispatch({ type: "SIGN_OUT" });
+          }
         }
       } catch (e) {
         console.error("Auth bootstrap error:", e);
@@ -137,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    bootstrapAsync();
+    void bootstrapAsync();
   }, []);
 
   const signIn = useCallback(async (username: string, password: string) => {
@@ -146,56 +199,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await authApi.login(username, password);
       await tokenManager.saveToken(result.accessToken, result.expiresAtUtc);
       dispatch({ type: "SIGN_IN", payload: result });
-    } catch (error: any) {
-      const message =
-        error.response?.data?.message ||
-        error.message ||
-        "登录失败，请重试";
-      dispatch({ type: "SET_ERROR", payload: message });
+    } catch (error: unknown) {
+      dispatch({ type: "SET_ERROR", payload: formatApiError(error, "登录失败，请重试") });
       throw error;
     } finally {
       dispatch({ type: "SET_LOADING", payload: false });
     }
   }, []);
 
-  const signUp = useCallback(async (username: string, password: string) => {
+  const signUp = useCallback(
+    async (username: string, password: string, email: string, emailCode: string) => {
+      try {
+        dispatch({ type: "SET_LOADING", payload: true });
+        const result = await authApi.register(username, password, email, emailCode);
+        await tokenManager.saveToken(result.accessToken, result.expiresAtUtc);
+        dispatch({ type: "SIGN_UP", payload: result });
+      } catch (error: unknown) {
+        dispatch({ type: "SET_ERROR", payload: formatApiError(error, "注册失败，请重试") });
+        throw error;
+      } finally {
+        dispatch({ type: "SET_LOADING", payload: false });
+      }
+    },
+    []
+  );
+
+  const signInWithEmail = useCallback(async (email: string, code: string) => {
     try {
       dispatch({ type: "SET_LOADING", payload: true });
-      const result = await authApi.register(username, password);
+      const result = await authApi.loginWithEmail(email, code);
       await tokenManager.saveToken(result.accessToken, result.expiresAtUtc);
-      dispatch({ type: "SIGN_UP", payload: result });
-    } catch (error: any) {
-      const message =
-        error.response?.data?.message ||
-        error.message ||
-        "注册失败，请重试";
-      dispatch({ type: "SET_ERROR", payload: message });
+      dispatch({ type: "SIGN_IN", payload: result });
+    } catch (error: unknown) {
+      dispatch({ type: "SET_ERROR", payload: formatApiError(error, "登录失败，请重试") });
       throw error;
     } finally {
       dispatch({ type: "SET_LOADING", payload: false });
     }
   }, []);
 
-  const signOut = useCallback(async () => {
+  const resetPassword = useCallback(async (email: string, code: string, newPassword: string) => {
     try {
-      await tokenManager.clearToken();
-      await resetInviteNotificationState();
-      dispatch({ type: "SIGN_OUT" });
-    } catch (error) {
-      console.error("Sign out error:", error);
+      dispatch({ type: "SET_LOADING", payload: true });
+      await authApi.resetPassword(email, code, newPassword);
+    } catch (error: unknown) {
+      dispatch({ type: "SET_ERROR", payload: formatApiError(error, "重置密码失败，请重试") });
+      throw error;
+    } finally {
+      dispatch({ type: "SET_LOADING", payload: false });
     }
   }, []);
+
+  const signOut = signOutInternal;
 
   const clearError = useCallback(() => {
     dispatch({ type: "CLEAR_ERROR" });
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const user = await authApi.getCurrentUser();
+    dispatch({ type: "UPDATE_USER", payload: user });
+  }, []);
+
+  const updateUser = useCallback((user: User) => {
+    dispatch({ type: "UPDATE_USER", payload: user });
+  }, []);
+
   const value: AuthContextType = {
     state,
     signIn,
+    signInWithEmail,
     signUp,
+    resetPassword,
     signOut,
     clearError,
+    refreshUser,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

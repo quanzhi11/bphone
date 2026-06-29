@@ -28,6 +28,57 @@ const ROOM_API_URLS = [
 let currentAuthUrl = AUTH_API_URLS[0];
 let currentRoomUrl = ROOM_API_URLS[0];
 
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
+
+export const getAuthApiRoot = () => currentAuthUrl;
+
+export function formatApiError(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const message = error.response?.data?.message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+    if (!error.response) {
+      if (error.code === "ECONNABORTED") {
+        return "请求超时，请稍后重试";
+      }
+      return "无法连接联机服务器，请检查网络";
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
+async function withAuthFailover<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  const tried = new Set<string>();
+
+  while (tried.size < AUTH_API_URLS.length) {
+    tried.add(currentAuthUrl);
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const canRetry =
+        axios.isAxiosError(error) &&
+        !error.response &&
+        switchAuthUrl() &&
+        !tried.has(currentAuthUrl);
+      if (!canRetry) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 // URL 切换函数（如果某个 URL 失败，自动尝试下一个）
 export const switchAuthUrl = () => {
   const currentIndex = AUTH_API_URLS.indexOf(currentAuthUrl);
@@ -58,6 +109,9 @@ const TOKEN_EXPIRY_KEY = "booxin_token_expiry";
 export interface User {
   id: string;
   username: string;
+  avatarUrl?: string | null;
+  email?: string | null;
+  isEmailVerified?: boolean;
   createdAtUtc: string;
   lastLoginAtUtc?: string;
   isOnline?: boolean;
@@ -96,6 +150,7 @@ export interface Room {
 export interface Friend {
   userId: string;
   username: string;
+  avatarUrl?: string | null;
   isOnline: boolean;
   isInRoom: boolean;
   roomCode?: string;
@@ -109,6 +164,7 @@ export interface FriendRequest {
   requestId: string;
   userId: string;
   username: string;
+  avatarUrl?: string | null;
   createdAtUtc: string;
 }
 
@@ -116,6 +172,7 @@ export interface RoomInvite {
   inviteId: string;
   senderUserId: string;
   senderUsername: string;
+  senderAvatarUrl?: string | null;
   roomCode: string;
   modpackUrl?: string;
   modpackGameVersion?: string;
@@ -128,6 +185,49 @@ export interface FriendsDashboard {
   incomingRequests: FriendRequest[];
   outgoingRequests: FriendRequest[];
   pendingRoomInvites: RoomInvite[];
+}
+
+export interface DirectMessageItem {
+  id: number;
+  senderId: string;
+  receiverId: string;
+  body: string;
+  sentAtUtc: string;
+  isMine: boolean;
+}
+
+export function normalizeDirectMessage(
+  raw: Partial<DirectMessageItem> & Record<string, unknown>,
+  selfUserId: string
+): DirectMessageItem {
+  const senderId = String(raw.senderId ?? raw.SenderId ?? "");
+  const receiverId = String(raw.receiverId ?? raw.ReceiverId ?? "");
+  const body = String(raw.body ?? raw.Body ?? "").trim();
+  const sentAtUtc = String(raw.sentAtUtc ?? raw.SentAtUtc ?? "");
+  const id = Number(raw.id ?? raw.Id ?? 0);
+  const isMine =
+    Boolean(raw.isMine ?? raw.IsMine) ||
+    (selfUserId.length > 0 &&
+      senderId.toLowerCase() === selfUserId.toLowerCase());
+
+  return { id, senderId, receiverId, body, sentAtUtc, isMine };
+}
+
+export interface DirectMessageHistory {
+  messages: DirectMessageItem[];
+}
+
+export interface DirectMessageConversation {
+  peerUserId: string;
+  peerUsername: string;
+  peerAvatarUrl?: string | null;
+  lastMessageBody: string;
+  lastMessageAtUtc: string;
+  unreadCount: number;
+}
+
+export interface DirectMessageConversations {
+  conversations: DirectMessageConversation[];
 }
 
 export interface RoomModpack {
@@ -249,8 +349,8 @@ const createAxiosInstance = (baseURL: string): AxiosInstance => {
     (response) => response,
     (error) => {
       if (error.response?.status === 401) {
-        // Token 过期或无效
-        tokenManager.clearToken();
+        void tokenManager.clearToken();
+        unauthorizedHandler?.();
       }
       return Promise.reject(error);
     }
@@ -259,67 +359,90 @@ const createAxiosInstance = (baseURL: string): AxiosInstance => {
   return instance;
 };
 
+async function authRequest<T>(call: (instance: AxiosInstance) => Promise<T>): Promise<T> {
+  return withAuthFailover(() => call(createAxiosInstance(currentAuthUrl)));
+}
+
 // ============ BooxinMultiplayerAuthApi (端口 5005) ============
 
 export const authApi = {
   async getPublicKey() {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.get("/api/auth/public-key");
+    const response = await authRequest((instance) => instance.get("/api/auth/public-key"));
     return response.data;
   },
 
-  async register(username: string, password: string): Promise<AuthToken> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.post("/api/auth/register", {
-      username,
-      password,
-    });
+  async register(username: string, password: string, email: string, emailCode: string): Promise<AuthToken> {
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/register", { username, password, email, emailCode })
+    );
+    return response.data;
+  },
+
+  async sendRegisterCode(email: string): Promise<{ message: string }> {
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/register/send-code", { email })
+    );
+    return response.data;
+  },
+
+  async sendEmailLoginCode(email: string): Promise<{ message: string }> {
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/email/login/send-code", { email })
+    );
+    return response.data;
+  },
+
+  async loginWithEmail(email: string, code: string): Promise<AuthToken> {
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/email/login", { email, code })
+    );
+    return response.data;
+  },
+
+  async sendPasswordResetCode(email: string): Promise<{ message: string }> {
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/password/forgot/send-code", { email })
+    );
+    return response.data;
+  },
+
+  async resetPassword(email: string, code: string, newPassword: string): Promise<{ message: string }> {
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/password/reset", { email, code, newPassword })
+    );
     return response.data;
   },
 
   async login(username: string, password: string): Promise<AuthToken> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.post("/api/auth/login", {
-      username,
-      password,
-    });
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/login", { username, password })
+    );
     return response.data;
   },
 
   async validate(accessToken: string) {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.post("/api/auth/validate", {
-      accessToken,
-    });
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/validate", { accessToken })
+    );
     return response.data;
   },
 
   async getCurrentUser(): Promise<User> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.get("/api/auth/me");
+    const response = await authRequest((instance) => instance.get("/api/auth/me"));
     return response.data;
   },
 
-  async changePassword(
-    currentPassword: string,
-    newPassword: string
-  ): Promise<{ message: string }> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.post("/api/auth/change-password", {
-      currentPassword,
-      newPassword,
-    });
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/change-password", { currentPassword, newPassword })
+    );
     return response.data;
   },
 
-  async searchUsers(
-    query: string,
-    limit: number = 10
-  ): Promise<PaginatedResponse<User>> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.get("/api/auth/users/search", {
-      params: { query, limit },
-    });
+  async searchUsers(query: string, limit: number = 10): Promise<PaginatedResponse<User>> {
+    const response = await authRequest((instance) =>
+      instance.get("/api/auth/users/search", { params: { query, limit } })
+    );
     return response.data;
   },
 
@@ -329,52 +452,95 @@ export const authApi = {
     onlineOnly: boolean = false,
     query: string = ""
   ): Promise<PaginatedResponse<User>> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.get("/api/auth/users/lobby", {
-      params: { page, pageSize, onlineOnly, query },
+    const response = await authRequest((instance) =>
+      instance.get("/api/auth/users/lobby", { params: { page, pageSize, onlineOnly, query } })
+    );
+    return response.data;
+  },
+
+  async uploadAvatar(uri: string, mimeType: string, fileName: string): Promise<User> {
+    return withAuthFailover(async () => {
+      const token = await tokenManager.getToken();
+      const formData = new FormData();
+      formData.append("file", {
+        uri,
+        type: mimeType,
+        name: fileName,
+      } as unknown as Blob);
+
+      const response = await axios.post<User>(`${currentAuthUrl}/api/auth/avatar`, formData, {
+        timeout: 30000,
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
+        transformRequest: (data) => data,
+      });
+      return response.data;
     });
+  },
+
+  async deleteAvatar(): Promise<void> {
+    await authRequest((instance) => instance.delete("/api/auth/avatar"));
+  },
+
+  async sendEmailBindCode(email: string): Promise<{ message: string }> {
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/email/send-code", { email })
+    );
+    return response.data;
+  },
+
+  async verifyEmailBind(email: string, code: string): Promise<User> {
+    const response = await authRequest((instance) =>
+      instance.post("/api/auth/email/verify", { email, code })
+    );
+    return response.data;
+  },
+
+  async unbindEmail(): Promise<User> {
+    const response = await authRequest((instance) => instance.delete("/api/auth/email"));
     return response.data;
   },
 };
+
+async function friendsRequest<T>(call: (instance: AxiosInstance) => Promise<T>): Promise<T> {
+  return withAuthFailover(() => call(createAxiosInstance(currentAuthUrl)));
+}
 
 // ============ Friends API (端口 5005) ============
 
 export const friendsApi = {
   async getFriendsDashboard(): Promise<FriendsDashboard> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.get("/api/friends");
+    const response = await friendsRequest((instance) => instance.get("/api/friends"));
     return response.data;
   },
 
-  async sendFriendRequest(
-    targetUserId?: string,
-    username?: string
-  ): Promise<{ message: string }> {
-    const instance = createAxiosInstance(currentAuthUrl);
+  async sendFriendRequest(targetUserId?: string, username?: string): Promise<{ message: string }> {
     const payload = targetUserId ? { targetUserId } : { username };
-    const response = await instance.post("/api/friends/request", payload);
+    const response = await friendsRequest((instance) =>
+      instance.post("/api/friends/request", payload)
+    );
     return response.data;
   },
 
   async acceptFriendRequest(requestId: string): Promise<{ message: string }> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.post(
-      `/api/friends/requests/${requestId}/accept`
+    const response = await friendsRequest((instance) =>
+      instance.post(`/api/friends/requests/${requestId}/accept`)
     );
     return response.data;
   },
 
   async rejectFriendRequest(requestId: string): Promise<{ message: string }> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.post(
-      `/api/friends/requests/${requestId}/reject`
+    const response = await friendsRequest((instance) =>
+      instance.post(`/api/friends/requests/${requestId}/reject`)
     );
     return response.data;
   },
 
   async deleteFriend(friendUserId: string): Promise<{ message: string }> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.delete(`/api/friends/${friendUserId}`);
+    const response = await friendsRequest((instance) =>
+      instance.delete(`/api/friends/${friendUserId}`)
+    );
     return response.data;
   },
 
@@ -385,39 +551,67 @@ export const friendsApi = {
     modpackGameVersion?: string,
     modpackLoader?: string
   ): Promise<{ message: string }> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const payload: any = {
-      roomCode,
-      isInRoom,
-    };
+    const payload: Record<string, unknown> = { roomCode, isInRoom };
     if (modpackUrl) payload.modpackUrl = modpackUrl;
     if (modpackGameVersion) payload.modpackGameVersion = modpackGameVersion;
     if (modpackLoader) payload.modpackLoader = modpackLoader;
 
-    const response = await instance.post("/api/friends/presence", payload);
+    const response = await friendsRequest((instance) =>
+      instance.post("/api/friends/presence", payload)
+    );
     return response.data;
   },
 
   async getRoomModpack(roomCode: string): Promise<RoomModpack> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.get("/api/friends/room-modpack", {
-      params: { roomCode },
-    });
+    const response = await friendsRequest((instance) =>
+      instance.get("/api/friends/room-modpack", { params: { roomCode } })
+    );
     return response.data;
   },
 
   async inviteFriend(friendUserId: string): Promise<{ message: string }> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.post("/api/friends/invites", {
-      friendUserId,
-    });
+    const response = await friendsRequest((instance) =>
+      instance.post("/api/friends/invites", { friendUserId })
+    );
     return response.data;
   },
 
   async dismissRoomInvite(inviteId: string): Promise<{ message: string }> {
-    const instance = createAxiosInstance(currentAuthUrl);
-    const response = await instance.post(
-      `/api/friends/invites/${inviteId}/dismiss`
+    const response = await friendsRequest((instance) =>
+      instance.post(`/api/friends/invites/${inviteId}/dismiss`)
+    );
+    return response.data;
+  },
+};
+
+async function messagesRequest<T>(call: (instance: AxiosInstance) => Promise<T>): Promise<T> {
+  return withAuthFailover(() => call(createAxiosInstance(currentAuthUrl)));
+}
+
+export const messagesApi = {
+  async send(receiverId: string, body: string): Promise<DirectMessageItem> {
+    const response = await messagesRequest((instance) =>
+      instance.post("/api/messages", { receiverId, body })
+    );
+    return response.data;
+  },
+
+  async getHistory(peerUserId: string, afterId: number = 0): Promise<DirectMessageHistory> {
+    const response = await messagesRequest((instance) =>
+      instance.get(`/api/messages/with/${peerUserId}`, { params: { afterId } })
+    );
+    return response.data;
+  },
+
+  async markRead(peerUserId: string, upToMessageId: number): Promise<void> {
+    await messagesRequest((instance) =>
+      instance.post("/api/messages/read", { peerUserId, upToMessageId })
+    );
+  },
+
+  async getConversations(): Promise<DirectMessageConversations> {
+    const response = await messagesRequest((instance) =>
+      instance.get("/api/messages/conversations")
     );
     return response.data;
   },

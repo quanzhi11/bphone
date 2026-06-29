@@ -21,6 +21,10 @@ export default function TabLayout() {
         tabBarActiveTintColor: glassColors.primary,
         tabBarInactiveTintColor: glassColors.textSecondary,
         headerShown: false,
+        sceneStyle: {
+          flex: 1,
+          backgroundColor: glassColors.bgPrimary,
+        },
         tabBarButton: HapticTab,
         tabBarStyle: {
           paddingTop: 6,
@@ -62,7 +66,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="account"
         options={{
-          title: "账户",
+          title: "我的",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={26} name="person.fill" color={color} />
           ),

@@ -1,8 +1,8 @@
 /**
  * 根布局
- *
- * 注册全部路由，由 useAuthGuard 根据登录状态重定向
  */
+
+import "@/lib/background-invite-task";
 
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
@@ -13,6 +13,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { InviteNotificationHost } from "@/components/invite-notification-host";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { DirectMessageProvider } from "@/lib/direct-message-context";
 import { NotificationProvider } from "@/lib/notification-context";
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -41,7 +42,15 @@ function RootLayoutNav() {
 
   return (
     <>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: {
+            flex: 1,
+            backgroundColor: "#0F1923",
+          },
+        }}
+      />
       {state.userToken != null ? <InviteNotificationHost /> : null}
     </>
   );
@@ -66,7 +75,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <NotificationProvider>
-            <RootLayoutNav />
+            <DirectMessageProvider>
+              <RootLayoutNav />
+            </DirectMessageProvider>
           </NotificationProvider>
         </AuthProvider>
       </ThemeProvider>

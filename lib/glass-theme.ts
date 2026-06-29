@@ -54,3 +54,9 @@ export const glassInputStyle = {
   paddingVertical: 12,
   fontSize: 15,
 } as const;
+
+/** FlatList / ScrollView 默认白底，需显式指定深色背景 */
+export const screenListStyle = {
+  flex: 1,
+  backgroundColor: glassColors.bgPrimary,
+} as const;

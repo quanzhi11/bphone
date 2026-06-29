@@ -18,7 +18,7 @@ import { GlassCard } from "@/components/glassmorphism";
 import { useColors } from "@/hooks/use-colors";
 import { useAuth } from "@/lib/auth-context";
 import { roomsApi, type Room } from "@/lib/_core/booxin-api";
-import { glassColors } from "@/lib/glass-theme";
+import { glassColors, screenListStyle } from "@/lib/glass-theme";
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -106,7 +106,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <ScreenContainer className="flex-1 px-4 pt-4">
+    <ScreenContainer style={{ paddingHorizontal: 16, paddingTop: 16 }}>
       {/* 页面标题 */}
       <View style={{ marginBottom: 20 }}>
         <Text style={{ color: glassColors.text, fontSize: 26, fontWeight: "800" }}>公共房间</Text>
@@ -125,6 +125,7 @@ export default function HomeScreen() {
           data={rooms}
           renderItem={renderRoomCard}
           keyExtractor={(item) => item.id}
+          style={screenListStyle}
           ListEmptyComponent={renderEmptyState}
           refreshControl={
             <RefreshControl

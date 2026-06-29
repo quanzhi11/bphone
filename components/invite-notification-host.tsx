@@ -1,5 +1,5 @@
 /**
- * 登录后轮询联机邀请，弹出应用内通知 + 本地推送。
+ * 登录后轮询联机邀请：前台弹窗 + 系统通知 + 后台任务
  */
 
 import { useCallback, useEffect, useRef } from "react";
@@ -15,17 +15,24 @@ import {
   pollNewRoomInvites,
   resetInviteNotificationState,
 } from "@/lib/invite-notification-poller";
-import { notificationManager } from "@/lib/notification-manager";
+import {
+  notificationManager,
+  type InviteNotificationTapPayload,
+} from "@/lib/notification-manager";
+import {
+  registerBackgroundInvitePolling,
+  unregisterBackgroundInvitePolling,
+} from "@/lib/background-invite-task";
 import type { RoomInvite } from "@/lib/_core/booxin-api";
 
 export function InviteNotificationHost() {
   const { state } = useAuth();
-  const { pendingInvite, showInviteNotification, dismissInviteNotification } =
-    useNotification();
+  const { pendingInvite, showInviteNotification, dismissInviteNotification } = useNotification();
   const router = useRouter();
   const queueRef = useRef<RoomInvite[]>([]);
   const showingRef = useRef(false);
   const pollingRef = useRef(false);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const presentNextInvite = useCallback(() => {
     if (showingRef.current || queueRef.current.length === 0) {
@@ -41,35 +48,45 @@ export function InviteNotificationHost() {
     showInviteNotification(next);
   }, [showInviteNotification]);
 
-  const enqueueInvites = useCallback(
-    async (invites: RoomInvite[]) => {
-      if (invites.length === 0) {
+  const maybeShowForegroundPopup = useCallback(
+    async (invite: RoomInvite) => {
+      const settings = await notificationManager.getSettings();
+      if (!settings.enabled || !settings.foregroundPopup) {
         return;
       }
-
-      for (const invite of invites) {
-        await markInviteNotified(invite.inviteId);
-        queueRef.current.push(invite);
-
-        const mode = await notificationManager.getNotificationMode();
-        if (mode !== "disabled") {
-          await notificationManager.sendLocalNotification(
-            "联机邀请",
-            `${invite.senderUsername} 邀请你加入房间 ${invite.roomCode}`,
-            {
-              type: "room_invite",
-              inviteId: invite.inviteId,
-              roomCode: invite.roomCode,
-            }
-          );
-        }
+      if (appStateRef.current !== "active") {
+        return;
       }
-
+      queueRef.current.push(invite);
       if (!showingRef.current && !pendingInvite) {
         presentNextInvite();
       }
     },
     [pendingInvite, presentNextInvite]
+  );
+
+  const handleIncomingInvites = useCallback(
+    async (invites: RoomInvite[]) => {
+      if (invites.length === 0) {
+        return;
+      }
+
+      const settings = await notificationManager.getSettings();
+      if (!settings.enabled) {
+        return;
+      }
+
+      for (const invite of invites) {
+        await markInviteNotified(invite.inviteId);
+
+        if (settings.systemNotification) {
+          await notificationManager.sendRoomInviteNotification(invite);
+        }
+
+        await maybeShowForegroundPopup(invite);
+      }
+    },
+    [maybeShowForegroundPopup]
   );
 
   const runPoll = useCallback(async () => {
@@ -80,40 +97,55 @@ export function InviteNotificationHost() {
     pollingRef.current = true;
     try {
       const newInvites = await pollNewRoomInvites();
-      await enqueueInvites(newInvites);
+      await handleIncomingInvites(newInvites);
     } catch (error) {
       console.error("[InvitePoll] failed:", error);
     } finally {
       pollingRef.current = false;
     }
-  }, [enqueueInvites, state.userToken]);
+  }, [handleIncomingInvites, state.userToken]);
+
+  const openInviteFromPayload = useCallback(
+    (payload: InviteNotificationTapPayload) => {
+      const invite = notificationManager.payloadToRoomInvite(payload);
+      showingRef.current = true;
+      showInviteNotification(invite);
+      router.push("/(tabs)/friends");
+    },
+    [router, showInviteNotification]
+  );
 
   useEffect(() => {
     if (!state.userToken) {
       queueRef.current = [];
       showingRef.current = false;
       dismissInviteNotification();
+      void unregisterBackgroundInvitePolling();
       return;
     }
 
     void notificationManager.initialize();
+    void registerBackgroundInvitePolling();
     void runPoll();
 
     const interval = setInterval(runPoll, INVITE_POLL_INTERVAL_MS);
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextState: AppStateStatus) => {
-        if (nextState === "active") {
-          void runPoll();
-        }
+    const appStateSub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      appStateRef.current = nextState;
+      if (nextState === "active") {
+        void runPoll();
       }
-    );
+    });
+
+    const tapUnsub = notificationManager.subscribeInviteTap((payload) => {
+      openInviteFromPayload(payload);
+    });
 
     return () => {
       clearInterval(interval);
-      subscription.remove();
+      appStateSub.remove();
+      tapUnsub();
     };
-  }, [dismissInviteNotification, runPoll, state.userToken]);
+  }, [dismissInviteNotification, openInviteFromPayload, runPoll, state.userToken]);
 
   useEffect(() => {
     if (!state.userToken) {

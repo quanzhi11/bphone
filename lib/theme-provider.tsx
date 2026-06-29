@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Appearance, View, useColorScheme as useSystemColorScheme } from "react-native";
-import { colorScheme as nativewindColorScheme, vars } from "nativewind";
+import { createContext, useCallback, useContext, useEffect, useMemo } from "react";
+import { View } from "react-native";
+import { colorScheme as nativewindColorScheme } from "nativewind";
 
 import { SchemeColors, type ColorScheme } from "@/constants/theme";
+import { glassColors } from "@/lib/glass-theme";
 
 type ThemeContextValue = {
   colorScheme: ColorScheme;
@@ -11,61 +12,31 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemScheme = useSystemColorScheme() ?? "light";
-  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(systemScheme);
+/** Booxin 手机版固定深色 UI，不跟随系统浅色模式。 */
+const APP_COLOR_SCHEME: ColorScheme = "dark";
 
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const applyScheme = useCallback((scheme: ColorScheme) => {
     nativewindColorScheme.set(scheme);
-    Appearance.setColorScheme?.(scheme);
-    if (typeof document !== "undefined") {
-      const root = document.documentElement;
-      root.dataset.theme = scheme;
-      root.classList.toggle("dark", scheme === "dark");
-      const palette = SchemeColors[scheme];
-      Object.entries(palette).forEach(([token, value]) => {
-        root.style.setProperty(`--color-${token}`, value);
-      });
-    }
   }, []);
 
-  const setColorScheme = useCallback((scheme: ColorScheme) => {
-    setColorSchemeState(scheme);
-    applyScheme(scheme);
-  }, [applyScheme]);
-
   useEffect(() => {
-    applyScheme(colorScheme);
-  }, [applyScheme, colorScheme]);
-
-  const themeVariables = useMemo(
-    () =>
-      vars({
-        "color-primary": SchemeColors[colorScheme].primary,
-        "color-background": SchemeColors[colorScheme].background,
-        "color-surface": SchemeColors[colorScheme].surface,
-        "color-foreground": SchemeColors[colorScheme].foreground,
-        "color-muted": SchemeColors[colorScheme].muted,
-        "color-border": SchemeColors[colorScheme].border,
-        "color-success": SchemeColors[colorScheme].success,
-        "color-warning": SchemeColors[colorScheme].warning,
-        "color-error": SchemeColors[colorScheme].error,
-      }),
-    [colorScheme],
-  );
+    applyScheme(APP_COLOR_SCHEME);
+  }, [applyScheme]);
 
   const value = useMemo(
     () => ({
-      colorScheme,
-      setColorScheme,
+      colorScheme: APP_COLOR_SCHEME,
+      setColorScheme: applyScheme,
     }),
-    [colorScheme, setColorScheme],
+    [applyScheme]
   );
-  console.log(value, themeVariables)
 
   return (
     <ThemeContext.Provider value={value}>
-      <View style={[{ flex: 1 }, themeVariables]}>{children}</View>
+      <View style={{ flex: 1, backgroundColor: glassColors.bgPrimary }}>
+        {children}
+      </View>
     </ThemeContext.Provider>
   );
 }
@@ -77,3 +48,5 @@ export function useThemeContext(): ThemeContextValue {
   }
   return ctx;
 }
+
+export { SchemeColors };

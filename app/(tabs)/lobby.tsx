@@ -1,6 +1,5 @@
 /**
  * 用户大厅 — 浏览全站用户、发送好友申请
- * 卡片式设计
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -13,20 +12,32 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Switch,
 } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
 import { GlassCard } from "@/components/glassmorphism";
-import { authApi, friendsApi, type User } from "@/lib/_core/booxin-api";
-import { glassColors, glassInputStyle } from "@/lib/glass-theme";
+import { UserAvatar } from "@/components/user-avatar";
+import { useAuth } from "@/lib/auth-context";
+import { authApi, friendsApi, formatApiError, type User } from "@/lib/_core/booxin-api";
+import { glassColors, glassInputStyle, screenListStyle } from "@/lib/glass-theme";
+
+const PAGE_SIZE = 30;
 
 export default function LobbyScreen() {
+  const { state } = useAuth();
+  const apiRoot = state.authApiRoot;
+
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [pendingUserIds, setPendingUserIds] = useState<Set<string>>(new Set());
+  const [onlineOnly, setOnlineOnly] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -35,6 +46,7 @@ export default function LobbyScreen() {
     }
     searchTimerRef.current = setTimeout(() => {
       setDebouncedSearch(search.trim());
+      setPage(1);
     }, 400);
 
     return () => {
@@ -47,14 +59,18 @@ export default function LobbyScreen() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await authApi.getLobbyUsers(1, 50, false, debouncedSearch);
+      setStatusMessage(null);
+      const data = await authApi.getLobbyUsers(page, PAGE_SIZE, onlineOnly, debouncedSearch);
       setUsers(data.users ?? []);
+      setTotalPages(data.totalPages ?? 0);
+      setTotalCount(data.totalCount ?? 0);
     } catch (error) {
-      console.error("Failed to fetch users:", error);
+      setUsers([]);
+      setStatusMessage(formatApiError(error, "加载用户大厅失败"));
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch]);
+  }, [page, onlineOnly, debouncedSearch]);
 
   useEffect(() => {
     void fetchUsers();
@@ -67,60 +83,71 @@ export default function LobbyScreen() {
   }, [fetchUsers]);
 
   const handleAddFriend = async (userId: string, username: string) => {
-    if (pendingUserIds.has(userId)) {
+    try {
+      await friendsApi.sendFriendRequest(userId);
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId ? { ...user, hasPendingOutgoingRequest: true } : user
+        )
+      );
+      Alert.alert("已发送", `已向 ${username} 发送好友申请`);
+    } catch (error) {
+      Alert.alert("错误", formatApiError(error, "发送好友申请失败"));
+    }
+  };
+
+  const handleAcceptRequest = async (user: User) => {
+    if (!user.pendingIncomingRequestId) {
       return;
     }
-
     try {
-      setPendingUserIds((prev) => new Set(prev).add(userId));
-      await friendsApi.sendFriendRequest(userId);
-      Alert.alert("已发送", `已向 ${username} 发送好友申请`);
-    } catch (error: unknown) {
-      setPendingUserIds((prev) => {
-        const next = new Set(prev);
-        next.delete(userId);
-        return next;
-      });
-      Alert.alert("错误", "发送好友申请失败");
+      await friendsApi.acceptFriendRequest(user.pendingIncomingRequestId);
+      Alert.alert("成功", `已与 ${user.username} 成为好友`);
+      await fetchUsers();
+    } catch (error) {
+      Alert.alert("错误", formatApiError(error, "接受好友申请失败"));
     }
   };
 
   const renderUser = ({ item }: { item: User }) => {
-    const requestSent = pendingUserIds.has(item.id);
+    const requestSent = item.hasPendingOutgoingRequest;
+    const canAccept = item.hasPendingIncomingRequest && item.pendingIncomingRequestId;
 
     return (
       <GlassCard className="mb-3 p-4">
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: glassColors.text, fontWeight: "600", fontSize: 15 }}>
-              {item.username}
-            </Text>
-            <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginTop: 2 }}>
-              {item.isOnline ? "在线" : "离线"}
-              {item.isInRoom ? " · 在房间" : ""}
-            </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 12 }}>
+            <UserAvatar avatarUrl={item.avatarUrl} apiRoot={apiRoot} size={44} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: glassColors.text, fontWeight: "600", fontSize: 15 }}>{item.username}</Text>
+              <Text style={{ color: glassColors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                {item.isOnline ? "在线" : "离线"}
+                {item.isInRoom ? " · 在房间" : ""}
+              </Text>
+            </View>
           </View>
 
           {item.isFriend ? (
             <View style={{ backgroundColor: "rgba(52, 211, 153, 0.12)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
-              <Text style={{ color: glassColors.success, fontSize: 12, fontWeight: "600" }}>
-                已是好友
-              </Text>
+              <Text style={{ color: glassColors.success, fontSize: 12, fontWeight: "600" }}>已是好友</Text>
             </View>
+          ) : canAccept ? (
+            <TouchableOpacity
+              onPress={() => handleAcceptRequest(item)}
+              style={{ backgroundColor: "rgba(52, 211, 153, 0.12)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
+            >
+              <Text style={{ color: glassColors.success, fontWeight: "600", fontSize: 13 }}>同意</Text>
+            </TouchableOpacity>
           ) : requestSent ? (
             <View style={{ backgroundColor: "rgba(251, 191, 36, 0.12)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
-              <Text style={{ color: glassColors.warning, fontSize: 12, fontWeight: "600" }}>
-                申请已发送
-              </Text>
+              <Text style={{ color: glassColors.warning, fontSize: 12, fontWeight: "600" }}>申请已发送</Text>
             </View>
           ) : (
             <TouchableOpacity
               onPress={() => handleAddFriend(item.id, item.username)}
               style={{ backgroundColor: "rgba(85, 184, 232, 0.15)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
             >
-              <Text style={{ color: glassColors.primary, fontWeight: "600", fontSize: 13 }}>
-                加好友
-              </Text>
+              <Text style={{ color: glassColors.primary, fontWeight: "600", fontSize: 13 }}>加好友</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -128,9 +155,9 @@ export default function LobbyScreen() {
     );
   };
 
-  return (
-    <ScreenContainer className="flex-1 px-4 pt-4">
-      <View style={{ marginBottom: 20 }}>
+  const listHeader = (
+    <View>
+      <View style={{ marginBottom: 16 }}>
         <Text style={{ color: glassColors.text, fontSize: 26, fontWeight: "800" }}>用户大厅</Text>
         <Text style={{ color: glassColors.textSecondary, fontSize: 13, marginTop: 4 }}>
           浏览全站用户并发送好友申请
@@ -142,32 +169,108 @@ export default function LobbyScreen() {
         placeholderTextColor={glassColors.textSecondary}
         value={search}
         onChangeText={setSearch}
-        style={[glassInputStyle, { marginBottom: 16 }]}
+        style={[glassInputStyle, { marginBottom: 12 }]}
       />
 
-      {loading && !refreshing ? (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 12,
+          paddingHorizontal: 4,
+        }}
+      >
+        <Text style={{ color: glassColors.textSecondary, fontSize: 13 }}>仅显示在线用户</Text>
+        <Switch
+          value={onlineOnly}
+          onValueChange={(value) => {
+            setOnlineOnly(value);
+            setPage(1);
+          }}
+          trackColor={{ false: glassColors.cardBorder, true: "rgba(85, 184, 232, 0.4)" }}
+          thumbColor={onlineOnly ? glassColors.primary : "#f4f3f4"}
+        />
+      </View>
+
+      {statusMessage ? (
+        <Text style={{ color: glassColors.warning, fontSize: 12, marginBottom: 8 }}>{statusMessage}</Text>
+      ) : null}
+    </View>
+  );
+
+  const listFooter = totalPages > 1 ? (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 12,
+        marginTop: 4,
+      }}
+    >
+      <TouchableOpacity
+        disabled={page <= 1}
+        onPress={() => setPage((p) => Math.max(1, p - 1))}
+        style={{
+          opacity: page <= 1 ? 0.4 : 1,
+          backgroundColor: glassColors.cardBg,
+          borderRadius: 8,
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+        }}
+      >
+        <Text style={{ color: glassColors.text }}>上一页</Text>
+      </TouchableOpacity>
+      <Text style={{ color: glassColors.textSecondary, fontSize: 13 }}>
+        {page} / {totalPages} · 共 {totalCount} 人
+      </Text>
+      <TouchableOpacity
+        disabled={page >= totalPages}
+        onPress={() => setPage((p) => p + 1)}
+        style={{
+          opacity: page >= totalPages ? 0.4 : 1,
+          backgroundColor: glassColors.cardBg,
+          borderRadius: 8,
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+        }}
+      >
+        <Text style={{ color: glassColors.text }}>下一页</Text>
+      </TouchableOpacity>
+    </View>
+  ) : null;
+
+  if (loading && !refreshing) {
+    return (
+      <ScreenContainer style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+        {listHeader}
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator size="large" color={glassColors.primary} />
         </View>
-      ) : (
-        <FlatList
-          data={users}
-          renderItem={renderUser}
-          keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={glassColors.primary}
-            />
-          }
-          ListEmptyComponent={
-            <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 48 }}>
-              <Text style={{ color: glassColors.textSecondary }}>暂无用户</Text>
-            </View>
-          }
-        />
-      )}
+      </ScreenContainer>
+    );
+  }
+
+  return (
+    <ScreenContainer>
+      <FlatList
+        data={users}
+        renderItem={renderUser}
+        keyExtractor={(item) => item.id}
+        style={screenListStyle}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={glassColors.primary} />
+        }
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 48 }}>
+            <Text style={{ color: glassColors.textSecondary }}>暂无用户</Text>
+          </View>
+        }
+        ListFooterComponent={listFooter}
+      />
     </ScreenContainer>
   );
 }
